@@ -9,7 +9,7 @@ try:
 except:
     API_KEY = "AIzaSyB4KsUP8EVImF8dhkFs2Bcln6e206o7nHk"
 
-genai.configure(api_key=API_KEY)
+genai.configure(api_key=AIzaSyB4KsUP8EVImF8dhkFs2Bcln6e206o7nHk)
 
 # السطر السحري اللي غايحل مشكل 404:
 # كنحددوا الموديل بالسمية الكاملة ديالو فالسيرفر
