@@ -6,9 +6,8 @@ from PIL import Image
 API_KEY = "AIzaSyB4KsUP8EVImF8dhkFs2Bcln6e206o7nHk"
 genai.configure(api_key=API_KEY)
 
-# 2. تحديد الموديل بطريقة احترافية لتجنب خطأ 404
-# استعملنا gemini-1.5-flash لأنه سريع واقتصادي
-model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+# هاد السطر كيحدد أننا بغينا النسخة المستقرة v1
+model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
 
 # 3. تصميم واجهة "لمعلم" (Professional UI)
 st.set_page_config(page_title="LM3LM - لملم", page_icon="👨‍🏫", layout="centered")
