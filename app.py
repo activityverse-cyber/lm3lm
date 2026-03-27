@@ -2,17 +2,16 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. إعدادات المفتاح (API KEY)
+# 1. إعداد المفتاح (API KEY)
 API_KEY = "AIzaSyB4KsUP8EVImF8dhkFs2Bcln6e206o7nHk"
 
-# الطريقة الأبسط والأضمن لتفادي 404 و TypeError
-# كنخليو الإعدادات عادية وكنركزو على تحديث المكتبة فالسيرفر
+# الإعداد البسيط (النسخة 0.8.3 غاتكلف بالباقي تلقائياً)
 genai.configure(api_key=API_KEY)
 
 # تعريف الموديل
 model = genai.GenerativeModel(model_name="gemini-1.5-flash")
 
-# 2. تصميم الواجهة (نفس الشكل اللي عجبك)
+# 2. تصميم الواجهة (UI)
 st.set_page_config(page_title="LM3LM - لملم", page_icon="👨‍🏫")
 
 st.markdown("""
@@ -24,24 +23,25 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("👨‍🏫 تطبيق LM3LM (لمعلم)")
-st.subheader("المساعد الدراسي الذكي 🇲🇦")
+st.write("المساعد الدراسي الذكي للتلاميذ 🇲🇦")
 
+# اختيار المستوى والمادة
 level = st.selectbox("🎯 المستوى الدراسي:", ["الابتدائي", "الإعدادي"])
 subject = st.selectbox("📚 المادة:", ["الرياضيات", "الفيزياء والكيمياء", "اللغات", "النشاط العلمي"])
 
-uploaded_file = st.file_uploader("📸 صور التمرين ديالك...", type=["jpg", "png", "jpeg"])
+uploaded_file = st.file_uploader("📸 صور التمرين وحطو هنا...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
     image = Image.open(uploaded_file)
-    st.image(image, caption='التمرين اللي صورتي', use_container_width=True)
+    st.image(image, caption='التمرين المرفوع', use_container_width=True)
 
     if st.button("يا لمعلم، شوف ليا هادشي"):
         with st.spinner('لمعلم كيقرا التمرين...'):
             try:
-                # محتوى الطلب (Prompt)
-                instruction = f"أنت 'لمعلم' خبير مغربي. شرح للتلميذ هاد التمرين من مستوى {level} مادة {subject} بالدارجة المغربية بأسلوب مشجع وبلا ما تعطيه الحل نيشان."
+                # الطلب بدارجة مغربية
+                instruction = f"أنت 'لمعلم' خبير مغربي. شرح للتلميذ هاد التمرين (مستوى {level} مادة {subject}) بالدارجة المغربية بأسلوب مشجع وبلا ما تعطيه الحل نيشان."
                 
-                # إرسال الطلب (هنا حيدنا كاع التعقيدات اللي دارت TypeError)
+                # إرسال الطلب
                 response = model.generate_content([instruction, image])
                 
                 st.markdown("### 💡 رد لمعلم:")
@@ -49,6 +49,6 @@ if uploaded_file:
                 
             except Exception as e:
                 st.error(f"وقع مشكل تقني: {e}")
-                st.info("نصيحة 'لمعلم': تأكد من تحديث ملف requirements.txt لآخر نسخة (0.8.3).")
+                st.info("نصيحة: تأكد بلي درتي Reboot للتطبيق فـ Streamlit Cloud.")
 
 st.markdown("<hr><center><small>مشروع Ibravolt - الجديدة 2026</small></center>", unsafe_allow_html=True)
