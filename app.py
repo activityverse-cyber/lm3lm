@@ -2,17 +2,18 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. إعداد المفتاح (API KEY)
-# درت ليك هاد الطريقة باش يخدم ليك فالحاسوب وفالسيرفر (GitHub)
+# 1. إعدادات الوصول (The Credentials)
+# هادا هو المفتاح اللي عطيتيني "يا لمعلم"
 API_KEY = "AIzaSyB4KsUP8EVImF8dhkFs2Bcln6e206o7nHk"
 
-# الإعداد السحري لتفادي خطأ 404: تحديد الإصدار v1 (المستقر)
-genai.configure(api_key=API_KEY, transport='rest') 
+# السطر السحري اللي كيحيد مشكل 404 فـ 2026:
+# كنحددوا api_version="v1" باش نهربوا من النسخة التجريبية (v1beta) اللي فيها المشكل
+genai.configure(api_key=API_KEY, api_version="v1", transport="rest")
 
-# تحديد الموديل (تأكد من كتابة السمية هكا بالظبط)
+# تعريف الموديل
 model = genai.GenerativeModel(model_name="gemini-1.5-flash")
 
-# 2. تصميم الواجهة (Modern & Clean UI)
+# 2. تصميم الواجهة (Custom Styling)
 st.set_page_config(page_title="LM3LM - لملم", page_icon="👨‍🏫", layout="centered")
 
 st.markdown("""
@@ -23,66 +24,68 @@ st.markdown("""
         direction: rtl;
         text-align: right;
     }
-    .main { background-color: #f8f9fa; }
+    .main { background-color: #f0f2f6; }
     .stButton > button {
-        background: linear-gradient(90deg, #2193b0, #6dd5ed);
+        background: linear-gradient(90deg, #1e3c72, #2a5298);
         color: white;
-        border-radius: 25px;
-        padding: 12px;
-        font-size: 20px;
+        border-radius: 20px;
+        padding: 15px;
+        font-size: 22px;
         width: 100%;
         border: none;
-        transition: 0.3s;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
-    .stButton > button:hover { transform: scale(1.02); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-    .app-title { color: #2193b0; text-align: center; font-size: 2.5rem; margin-bottom: 0; }
-    .app-subtitle { text-align: center; color: #7f8c8d; margin-bottom: 2rem; }
+    .app-title { color: #1e3c72; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. محتوى التطبيق
+# 3. محتوى الصفحة الرئيسي
 st.markdown('<h1 class="app-title">👨‍🏫 تطبيق LM3LM (لمعلم)</h1>', unsafe_allow_html=True)
-st.markdown('<p class="app-subtitle">المساعد الدراسي لتلاميذ الابتدائي والإعدادي 🇲🇦</p>', unsafe_allow_html=True)
+st.markdown('<p style="text-align: center; color: #555;">مساعدك الذكي في تمارين الابتدائي والإعدادي 🇲🇦</p>', unsafe_allow_html=True)
 
-# اختيار المستوى والمادة في صف واحد
+st.divider()
+
+# اختيارات المستوى والمادة
 col1, col2 = st.columns(2)
 with col1:
-    level = st.selectbox("🎯 اختار مستواك:", ["الابتدائي", "الإعدادي"])
+    level = st.selectbox("🎯 مستواك الدراسي:", ["الابتدائي", "الإعدادي"])
 with col2:
     if level == "الابتدائي":
         subjects = ["اللغة العربية", "الرياضيات", "الفرنسية", "النشاط العلمي"]
     else:
-        subjects = ["الرياضيات", "الفيزياء والكيمياء", "اللغات", "علوم الحياة والأرض"]
-    subject = st.selectbox("📚 أشنو المادة؟", subjects)
+        subjects = ["الرياضيات", "الفيزياء والكيمياء", "علوم الحياة والأرض", "اللغات"]
+    subject = st.selectbox("📚 المادة:", subjects)
 
-st.divider()
-
-# منطقة رفع الصورة
-uploaded_file = st.file_uploader("📸 صور التمرين وحطو هنا (JPG, PNG)...", type=["jpg", "png", "jpeg"])
+# رفع الصورة من طرف التلميذ
+uploaded_file = st.file_uploader("📸 صور التمرين أو الحل وحطو هنا...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
+    # عرض الصورة للمعاينة
     image = Image.open(uploaded_file)
-    st.image(image, caption='المعاينة ديال التمرين', use_container_width=True)
+    st.image(image, caption='الصورة اللي رفعتي', use_container_width=True)
 
+    # زر التحليل
     if st.button("يا لمعلم، شوف ليا هادشي"):
-        with st.spinner('لمعلم جالس كيشوف فالتمرين... 🧐'):
+        with st.spinner('لمعلم كيقرا التمرين وكيحلل... 🧐'):
             try:
-                # البرومت المخصص
+                # تعليمات 'لمعلم' بالدارجة
                 prompt = f"""
-                أنت 'لمعلم' خبير في التعليم المغربي لمستوى {level} مادة {subject}.
-                خاطب التلميذ بلهجة مغربية (دارجة) محفزة وودودة.
-                لا تعطِ الحل النهائي مباشرة، بل اشرح الطريقة بتبسيط ووجهه لاكتشاف الخطأ إن وجد.
-                استعمل إيموجيات تشجيعية.
+                أنت 'لمعلم' خبير تعليمي مغربي لمستوى {level} في مادة {subject}.
+                1. تكلم بالدارجة المغربية بأسلوب مشجع وحنين (مثل المعلمين المغاربة القدماء).
+                2. لا تعط الجواب مباشرة، اشرح الطريقة بتبسيط.
+                3. إذا وجد خطأ، قل 'أجي نعاودو نفكرو فهاد السطر' وشرح ليه علاش.
+                4. استخدم إيموجيات مغربية محفزة.
                 """
                 
-                # إرسال الطلب (هنا فين كتحل المشاكل ديال الإصدار)
+                # إرسال الصورة والتعليمات
                 response = model.generate_content([prompt, image])
                 
+                # عرض النتيجة
                 st.markdown("### 💡 رد لمعلم:")
                 st.info(response.text)
                 
             except Exception as e:
                 st.error(f"وقع مشكل تقني: {e}")
-                st.warning("نصيحة: تأكد من تحديث المكتبة: pip install --upgrade google-generativeai")
+                st.warning("نصيحة 'لمعلم': تأكد بلي درتي Reboot للتطبيق فـ Streamlit Cloud.")
 
-st.markdown("<br><hr><center><small>تطبيق LM3LM © 2026 - مشروع Ibravolt الذكي</small></center>", unsafe_allow_html=True)
+st.markdown("<br><hr><center><small>تطبيق LM3LM © 2026 - مشروع Ibravolt المبتكر</small></center>", unsafe_allow_html=True)
