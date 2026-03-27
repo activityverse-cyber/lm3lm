@@ -1,19 +1,18 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
-import google.ai.generativelanguage as gl
 
-# 1. إعدادات المفتاح
+# 1. إعدادات المفتاح (API KEY)
 API_KEY = "AIzaSyB4KsUP8EVImF8dhkFs2Bcln6e206o7nHk"
 
-# السطر السحري اللي كيقطع الطريق على v1beta نهائياً:
-client_options = {"api_endpoint": "generativelanguage.googleapis.com"}
-genai.configure(api_key=API_KEY, transport="rest", client_options=client_options)
+# الطريقة الأبسط والأضمن لتفادي 404 و TypeError
+# كنخليو الإعدادات عادية وكنركزو على تحديث المكتبة فالسيرفر
+genai.configure(api_key=API_KEY)
 
-# تعريف الموديل مع فرض نسخة v1 فكل طلب
-model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+# تعريف الموديل
+model = genai.GenerativeModel(model_name="gemini-1.5-flash")
 
-# 2. تصميم الواجهة (نفس الديزاين اللي عجبك)
+# 2. تصميم الواجهة (نفس الشكل اللي عجبك)
 st.set_page_config(page_title="LM3LM - لملم", page_icon="👨‍🏫")
 
 st.markdown("""
@@ -27,7 +26,6 @@ st.markdown("""
 st.title("👨‍🏫 تطبيق LM3LM (لمعلم)")
 st.subheader("المساعد الدراسي الذكي 🇲🇦")
 
-# اختيار المستوى والمادة
 level = st.selectbox("🎯 المستوى الدراسي:", ["الابتدائي", "الإعدادي"])
 subject = st.selectbox("📚 المادة:", ["الرياضيات", "الفيزياء والكيمياء", "اللغات", "النشاط العلمي"])
 
@@ -41,20 +39,16 @@ if uploaded_file:
         with st.spinner('لمعلم كيقرا التمرين...'):
             try:
                 # محتوى الطلب (Prompt)
-                instruction = f"أنت 'لمعلم' خبير مغربي. شرح للتلميذ هاد التمرين (مستوى {level} مادة {subject}) بالدارجة المغربية بأسلوب مشجع وبلا ما تعطيه الحل نيشان."
+                instruction = f"أنت 'لمعلم' خبير مغربي. شرح للتلميذ هاد التمرين من مستوى {level} مادة {subject} بالدارجة المغربية بأسلوب مشجع وبلا ما تعطيه الحل نيشان."
                 
-                # إرسال الطلب مع تحديد الـ API Version يدوياً
-                response = model.generate_content(
-                    [instruction, image],
-                    request_options={"timeout": 600, "api_version": "v1"}
-                )
+                # إرسال الطلب (هنا حيدنا كاع التعقيدات اللي دارت TypeError)
+                response = model.generate_content([instruction, image])
                 
                 st.markdown("### 💡 رد لمعلم:")
                 st.success(response.text)
                 
             except Exception as e:
-                # إذا طاح "ديجونكتور" آخر، غايطلع لينا هنا بالظبط فين كاين
                 st.error(f"وقع مشكل تقني: {e}")
-                st.info("نصيحة: تأكد من تحديث ملف requirements.txt لآخر نسخة.")
+                st.info("نصيحة 'لمعلم': تأكد من تحديث ملف requirements.txt لآخر نسخة (0.8.3).")
 
 st.markdown("<hr><center><small>مشروع Ibravolt - الجديدة 2026</small></center>", unsafe_allow_html=True)
