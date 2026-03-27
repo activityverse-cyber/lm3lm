@@ -2,14 +2,17 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. إعداد المفتاح (API KEY) اللي عطيتيني
+# 1. إعداد المفتاح (API KEY)
+# درت ليك هاد الطريقة باش يخدم ليك فالحاسوب وفالسيرفر (GitHub)
 API_KEY = "AIzaSyB4KsUP8EVImF8dhkFs2Bcln6e206o7nHk"
-genai.configure(api_key=API_KEY)
 
-# هاد السطر كيحدد أننا بغينا النسخة المستقرة v1
-model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+# الإعداد السحري لتفادي خطأ 404: تحديد الإصدار v1 (المستقر)
+genai.configure(api_key=API_KEY, transport='rest') 
 
-# 3. تصميم واجهة "لمعلم" (Professional UI)
+# تحديد الموديل (تأكد من كتابة السمية هكا بالظبط)
+model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+
+# 2. تصميم الواجهة (Modern & Clean UI)
 st.set_page_config(page_title="LM3LM - لملم", page_icon="👨‍🏫", layout="centered")
 
 st.markdown("""
@@ -20,66 +23,66 @@ st.markdown("""
         direction: rtl;
         text-align: right;
     }
+    .main { background-color: #f8f9fa; }
     .stButton > button {
         background: linear-gradient(90deg, #2193b0, #6dd5ed);
         color: white;
         border-radius: 25px;
-        padding: 10px 20px;
-        font-size: 18px;
+        padding: 12px;
+        font-size: 20px;
         width: 100%;
         border: none;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: 0.3s;
     }
-    .app-header {
-        text-align: center;
-        color: #2193b0;
-    }
+    .stButton > button:hover { transform: scale(1.02); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    .app-title { color: #2193b0; text-align: center; font-size: 2.5rem; margin-bottom: 0; }
+    .app-subtitle { text-align: center; color: #7f8c8d; margin-bottom: 2rem; }
     </style>
     """, unsafe_allow_html=True)
 
-# 4. محتوى الصفحة
-st.markdown('<h1 class="app-header">👨‍🏫 تطبيق LM3LM (لمعلم)</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align: center; color: #7f8c8d;">المساعد الدراسي الذكي للابتدائي والإعدادي 🇲🇦</p>', unsafe_allow_html=True)
+# 3. محتوى التطبيق
+st.markdown('<h1 class="app-title">👨‍🏫 تطبيق LM3LM (لمعلم)</h1>', unsafe_allow_html=True)
+st.markdown('<p class="app-subtitle">المساعد الدراسي لتلاميذ الابتدائي والإعدادي 🇲🇦</p>', unsafe_allow_html=True)
+
+# اختيار المستوى والمادة في صف واحد
+col1, col2 = st.columns(2)
+with col1:
+    level = st.selectbox("🎯 اختار مستواك:", ["الابتدائي", "الإعدادي"])
+with col2:
+    if level == "الابتدائي":
+        subjects = ["اللغة العربية", "الرياضيات", "الفرنسية", "النشاط العلمي"]
+    else:
+        subjects = ["الرياضيات", "الفيزياء والكيمياء", "اللغات", "علوم الحياة والأرض"]
+    subject = st.selectbox("📚 أشنو المادة؟", subjects)
 
 st.divider()
 
-# اختيار المستوى والمادة
-col1, col2 = st.columns(2)
-with col1:
-    level = st.selectbox("🎯 المستوى الدراسي:", ["الابتدائي", "الإعدادي"])
-with col2:
-    if level == "الابتدائي":
-        subject = st.selectbox("📚 المادة:", ["اللغة العربية", "الرياضيات", "الفرنسية", "النشاط العلمي"])
-    else:
-        subject = st.selectbox("📚 المادة:", ["الرياضيات", "الفيزياء والكيمياء", "اللغات", "علوم الحياة والأرض"])
-
-# رفع الصورة
-uploaded_file = st.file_uploader("📸 صور التمرين وحطو هنا...", type=["jpg", "png", "jpeg"])
+# منطقة رفع الصورة
+uploaded_file = st.file_uploader("📸 صور التمرين وحطو هنا (JPG, PNG)...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
     image = Image.open(uploaded_file)
-    st.image(image, caption='التمرين المرفوع', use_container_width=True)
+    st.image(image, caption='المعاينة ديال التمرين', use_container_width=True)
 
-    if st.button("يا لمعلم، شوف ليا هاد التمرين"):
-        with st.spinner('لمعلم كيقرا التمرين بالخاطر... 🧐'):
+    if st.button("يا لمعلم، شوف ليا هادشي"):
+        with st.spinner('لمعلم جالس كيشوف فالتمرين... 🧐'):
             try:
-                # التعليمات المخصصة للمعلم (System Instructions)
+                # البرومت المخصص
                 prompt = f"""
-                أنت 'لمعلم' خبير في التعليم المغربي. التلميذ في مستوى {level} ويحتاج مساعدة في {subject}.
-                1. تكلم بالدارجة المغربية بأسلوب مشجع وحنين.
-                2. لا تعط الجواب النهائي مباشرة.
-                3. اشرح الخطوات بتبسيط (مثلاً للابتدائي استعمل أمثلة من الواقع).
-                4. إذا كان هناك خطأ في الحل، نبه التلميذ بذكاء وقل له 'أجي نفكرو فهادي'.
+                أنت 'لمعلم' خبير في التعليم المغربي لمستوى {level} مادة {subject}.
+                خاطب التلميذ بلهجة مغربية (دارجة) محفزة وودودة.
+                لا تعطِ الحل النهائي مباشرة، بل اشرح الطريقة بتبسيط ووجهه لاكتشاف الخطأ إن وجد.
+                استعمل إيموجيات تشجيعية.
                 """
                 
-                # إرسال الصورة والطلب لـ Gemini
+                # إرسال الطلب (هنا فين كتحل المشاكل ديال الإصدار)
                 response = model.generate_content([prompt, image])
                 
                 st.markdown("### 💡 رد لمعلم:")
-                st.success(response.text)
+                st.info(response.text)
                 
             except Exception as e:
                 st.error(f"وقع مشكل تقني: {e}")
-                st.info("نصيحة: تأكد بلي درتي pip install --upgrade google-generativeai في الـ Terminal.")
+                st.warning("نصيحة: تأكد من تحديث المكتبة: pip install --upgrade google-generativeai")
 
-st.markdown("<br><hr><center><small>حقوق النشر © 2026 - مشروع LM3LM لمساعدة تلاميذ المغرب</small></center>", unsafe_allow_html=True)
+st.markdown("<br><hr><center><small>تطبيق LM3LM © 2026 - مشروع Ibravolt الذكي</small></center>", unsafe_allow_html=True)
