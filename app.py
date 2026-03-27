@@ -1,54 +1,58 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
 from PIL import Image
+import io
+import base64
 
-# 1. إعداد المفتاح (API KEY)
+# 1. الإعدادات
 API_KEY = "AIzaSyB4KsUP8EVImF8dhkFs2Bcln6e206o7nHk"
+URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
 
-# الإعداد البسيط (النسخة 0.8.3 غاتكلف بالباقي تلقائياً)
-genai.configure(api_key=API_KEY)
+# وظيفة لتحويل الصورة لـ Base64
+def encode_image(image_file):
+    return base64.b64encode(image_file.getvalue()).decode('utf-8')
 
-# تعريف الموديل
-model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-
-# 2. تصميم الواجهة (UI)
+# 2. واجهة التطبيق
 st.set_page_config(page_title="LM3LM - لملم", page_icon="👨‍🏫")
-
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Tajawal', sans-serif; direction: rtl; text-align: right; }
-    .stButton>button { background: linear-gradient(90deg, #1e3c72, #2a5298); color: white; border-radius: 20px; width: 100%; height: 50px; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
-
 st.title("👨‍🏫 تطبيق LM3LM (لمعلم)")
-st.write("المساعد الدراسي الذكي للتلاميذ 🇲🇦")
+st.write("المساعد الدراسي الذكي - نسخة 2026 🇲🇦")
 
-# اختيار المستوى والمادة
-level = st.selectbox("🎯 المستوى الدراسي:", ["الابتدائي", "الإعدادي"])
-subject = st.selectbox("📚 المادة:", ["الرياضيات", "الفيزياء والكيمياء", "اللغات", "النشاط العلمي"])
+level = st.selectbox("🎯 المستوى:", ["الابتدائي", "الإعدادي"])
+subject = st.selectbox("📚 المادة:", ["الرياضيات", "الفيزياء", "اللغات", "النشاط العلمي"])
 
-uploaded_file = st.file_uploader("📸 صور التمرين وحطو هنا...", type=["jpg", "png", "jpeg"])
+uploaded_file = st.file_uploader("📸 صور التمرين...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
-    image = Image.open(uploaded_file)
-    st.image(image, caption='التمرين المرفوع', use_container_width=True)
-
+    st.image(uploaded_file, caption='التمرين المرفوع', use_container_width=True)
+    
     if st.button("يا لمعلم، شوف ليا هادشي"):
         with st.spinner('لمعلم كيقرا التمرين...'):
             try:
-                # الطلب بدارجة مغربية
-                instruction = f"أنت 'لمعلم' خبير مغربي. شرح للتلميذ هاد التمرين (مستوى {level} مادة {subject}) بالدارجة المغربية بأسلوب مشجع وبلا ما تعطيه الحل نيشان."
+                # تجهيز البيانات للإرسال "Direct"
+                image_base64 = encode_image(uploaded_file)
                 
-                # إرسال الطلب
-                response = model.generate_content([instruction, image])
+                payload = {
+                    "contents": [{
+                        "parts": [
+                            {"text": f"أنت 'لمعلم' خبير مغربي. شرح للتلميذ هاد التمرين من مستوى {level} مادة {subject} بالدارجة المغربية بأسلوب مشجع وبلا ما تعطيه الحل نيشان."},
+                            {"inline_data": {"mime_type": "image/jpeg", "data": image_base64}}
+                        ]
+                    }]
+                }
                 
-                st.markdown("### 💡 رد لمعلم:")
-                st.success(response.text)
+                # إرسال الطلب مباشرة لـ Google API v1
+                response = requests.post(URL, json=payload)
+                result = response.json()
                 
+                # إظهار الجواب
+                if "candidates" in result:
+                    answer = result['candidates'][0]['content']['parts'][0]['text']
+                    st.markdown("### 💡 رد لمعلم:")
+                    st.info(answer)
+                else:
+                    st.error(f"خطأ من Google: {result}")
+                    
             except Exception as e:
-                st.error(f"وقع مشكل تقني: {e}")
-                st.info("نصيحة: تأكد بلي درتي Reboot للتطبيق فـ Streamlit Cloud.")
+                st.error(f"مشكل فالاتصال: {e}")
 
-st.markdown("<hr><center><small>مشروع Ibravolt - الجديدة 2026</small></center>", unsafe_allow_html=True)
+st.markdown("<hr><center><small>Ibravolt - El Jadida 2026</small></center>", unsafe_allow_html=True)
