@@ -2,25 +2,22 @@ import streamlit as st
 import requests
 from PIL import Image
 import io
+import base64
 
-# 1. إعدادات الساروت الجديد (HF_TOKEN)
+# 1. إعدادات الساروت (HF_TOKEN) من Secrets
 try:
     HF_TOKEN = st.secrets["HF_TOKEN"]
 except:
-    st.error("⚠️ الساروت (HF_TOKEN) ما كاينش فـ Secrets ديال Streamlit!")
+    st.error("⚠️ الساروت (HF_TOKEN) ما كاينش فـ Secrets!")
     st.stop()
 
-# رابط الموديل (Moondream - متخصص ففهم الصور)
-API_URL = "https://api-inference.huggingface.co/models/vikhyatk/moondream2"
+# العنوان الجديد (الروتر) اللي طلبو منك Hugging Face
+# استعملنا موديل Qwen2-VL حيت واعر بزاف فـ 2026 وكيقرا العربية
+API_URL = "https://router.huggingface.co/hf-inference/models/Qwen/Qwen2-VL-7B-Instruct"
 headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-
-def query(payload):
-    response = requests.post(API_URL, headers=headers, json=payload)
-    return response.json()
 
 st.set_page_config(page_title="LM3LM - لملم", page_icon="👨‍🏫")
 st.title("👨‍🏫 تطبيق LM3LM (لمعلم)")
-st.write("نسخة Hugging Face الاحترافية 🇲🇦")
 
 uploaded_file = st.file_uploader("📸 صور التمرين وحطو هنا...", type=["jpg", "png", "jpeg"])
 
@@ -29,31 +26,38 @@ if uploaded_file:
     st.image(image, caption='التمرين المرفوع', use_container_width=True)
 
     if st.button("يا لمعلم، شوف ليا هادشي"):
-        with st.spinner('لمعلم كيقرا التمرين...'):
+        with st.spinner('لمعلم كيقرا التمرين من الروتر الجديد...'):
             try:
-                # تحويل الصورة لـ Base64 باش يصيفطها للسيرفر
-                import base64
+                # تحويل الصورة لـ Base64
                 buffered = io.BytesIO()
                 image.save(buffered, format="JPEG")
                 img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                # إرسال السؤال للموديل
-                # طلبنا منو يوصف التمرين ويشرحو
-                output = query({
-                    "inputs": {
-                        "image": img_str,
-                        "text": "Explain this educational exercise and provide a hint to solve it in Moroccan Darija Arabic if possible."
-                    }
-                })
+                # بناء الطلب للموديل الجديد (Qwen2-VL)
+                payload = {
+                    "inputs": f"<html><img src='data:image/jpeg;base64,{img_str}'></html>\nشرح هاد التمرين بالدارجة المغربية بأسلوب مبسط للتلميذ.",
+                    "parameters": {"max_new_tokens": 500}
+                }
+
+                response = requests.post(API_URL, headers=headers, json=payload)
+                result = response.json()
 
                 st.markdown("---")
                 st.markdown("### 💡 رد لمعلم:")
-                if 'generated_text' in output:
-                    st.success(output['generated_text'])
+                
+                # التعامل مع ردود السيرفر (إما نص مباشر أو قائمة)
+                if isinstance(result, list) and 'generated_text' in result[0]:
+                    st.success(result[0]['generated_text'])
+                elif 'generated_text' in result:
+                    st.success(result['generated_text'])
                 else:
-                    st.info(output) # فاش كيكون الموديل كيسخن (Loading)
+                    # إلا كان الموديل عاد كيتشارجا (Loading)
+                    if 'estimated_time' in result:
+                        st.warning(f"السيرفر كيوجد.. عاود ورك على البوتون مورا {int(result['estimated_time'])} ثانية.")
+                    else:
+                        st.error(f"خطأ غير متوقع: {result}")
             
             except Exception as e:
-                st.error(f"وقع مشكل فالسيرفر: {e}")
+                st.error(f"وقع مشكل تقني: {e}")
 
-st.markdown("<br><hr><center><small>مشروع LM3LM - الجديدة 2026</small></center>", unsafe_allow_html=True)
+st.markdown("<hr><center><small>Ibravolt - El Jadida 2026</small></center>", unsafe_allow_html=True)
