@@ -1,79 +1,91 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
+import io
 
-# 1. إعداد الصفحة والستايل (CSS)
-st.set_page_config(page_title="LM3LM - لملم", page_icon="👨‍🏫", layout="centered")
+# 1. إعدادات الصفحة والستايل
+st.set_page_config(page_title="LM3LM - الحوار الذكي", page_icon="👨‍🏫", layout="wide")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
     html, body, [class*="css"] { font-family: 'Tajawal', sans-serif; direction: rtl; text-align: right; }
-    .stMarkdown, .stText, .stAlert { direction: rtl; text-align: right; }
-    .answer-box {
-        background-color: #f0f7ff;
-        border-right: 5px solid #2a5298;
-        padding: 20px;
-        border-radius: 10px;
-        color: #1e3c72;
-        line-height: 1.6;
-    }
-    /* ستايل لبوتون الكاميرا */
-    .stCameraInput > label { font-weight: bold; color: #2a5298; }
+    .chat-message { padding: 15px; border-radius: 15px; margin-bottom: 10px; display: inline-block; width: auto; max-width: 80%; }
+    .user-msg { background-color: #e1f5fe; float: right; color: #0277bd; }
+    .teacher-msg { background-color: #f1f8e9; float: left; border-right: 5px solid #558b2f; color: #2e7d32; }
+    .stButton>button { width: 100%; border-radius: 20px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. الربط مع الساروت
+# 2. تفعيل الذاكرة (Chat History)
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# 3. الربط مع الساروت
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel("gemini-1.5-flash")
 except:
-    st.error("⚠️ الساروت GOOGLE_API_KEY ما كاينش فـ Secrets!")
+    st.error("⚠️ الساروت ناقص!")
     st.stop()
 
-# 3. واجهة المستخدم
-st.title("👨‍🏫 تطبيق LM3LM (لمعلم)")
-st.write("صور تمرينك و 'لمعلم' يشرح ليك بالدارجة 🇲🇦")
+# 4. واجهة المستخدم
+st.title("👨‍🏫 معلمك الخاص: حوار ذكي")
 
-# ديرو جوج طرق: كاميرا ولا رفع ملف
-tab1, tab2 = st.tabs(["📸 صور دابا", "📁 جبد من التيليفون"])
+# --- القائمة الجانبية للكاميرا والصوت ---
+with st.sidebar:
+    st.header("📸 أدوات المساعدة")
+    
+    # اختيار الكاميرا (زدنا تحسين باش تبان أوضح)
+    enable_cam = st.checkbox("فتح الكاميرا")
+    img_file = None
+    if enable_cam:
+        img_file = st.camera_input("صور التمرين بوضوح", help="حاول تجيب الضو مزيان باش تكون الصورة واضحة")
+    
+    st.divider()
+    
+    # أيقونة الميكرو (ملاحظة: Streamlit كتحتاج إضافة خاصة للصوت، غانديرو دابا مساحة للصوت)
+    st.write("🎙️ التحدث مع لمعلم")
+    audio_value = st.audio_input("اضغط وسجل سؤالك")
 
-img_to_process = None
+# --- عرض الحوار (Chat Interface) ---
+chat_container = st.container()
 
-with tab1:
-    # هادي هي "الأيقونة" والخاصية اللي طلبتي د الكاميرا
-    cam_image = st.camera_input("وجه الكاميرا للتمرين وصور")
-    if cam_image:
-        img_to_process = Image.open(cam_image)
+with chat_container:
+    for message in st.session_state.messages:
+        role_class = "user-msg" if message["role"] == "user" else "teacher-msg"
+        st.markdown(f'<div class="chat-message {role_class}">{message["content"]}</div>', unsafe_allow_html=True)
+        st.write("") # فاصل
 
-with tab2:
-    file_image = st.file_uploader("اختار صورة من الغاليري", type=["jpg", "png", "jpeg"])
-    if file_image:
-        img_to_process = Image.open(file_image)
+# --- إدخال النص أو معالجة الصورة ---
+prompt = st.chat_input("اكتب سؤالك هنا أو صور التمرين...")
 
-# 4. المعالجة والرد
-if img_to_process:
-    st.image(img_to_process, caption='الصورة اللي غانشرحو', use_container_width=True)
-
-    if st.button("يا لمعلم، شرح ليا هادشي"):
-        with st.spinner('لمعلم كيقرا التمرين...'):
+if prompt or img_file or audio_value:
+    user_content = prompt if prompt else "شوف هاد التمرين (صورة/صوت)"
+    
+    # إضافة سؤال التلميذ للذاكرة
+    st.session_state.messages.append({"role": "user", "content": user_content})
+    
+    with st.chat_message("assistant"):
+        with st.spinner("لمعلم كيفكر..."):
             try:
-                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                target_model = next((m for m in available_models if "flash" in m or "vision" in m), None)
+                # جمع البيانات (نص + صورة + صوت إذا وجد)
+                content_list = [f"أنت 'لمعلم' خبير مغربي. جاوب التلميذ بالدارجة المغربية بأسلوب مشجع. إذا كانت هناك صورة، اشرحها خطوة بخطوة."]
+                if prompt: content_list.append(prompt)
+                if img_file: content_list.append(Image.open(img_file))
+                if audio_value: content_list.append("التلميذ أرسل تسجيلاً صوتياً، جاوبه على سؤاله.")
+
+                response = model.generate_content(content_list)
+                full_response = response.text
                 
-                if target_model:
-                    model = genai.GenerativeModel(target_model)
-                    response = model.generate_content([
-                        "أنت 'لمعلم' خبير تعليمي مغربي. اشرح هذا التمرين للتلميذ بالدارجة المغربية بأسلوب مشجع ومبسط. لا تعطِ الحل النهائي مباشرة، بل وجهه للحل خطوة بخطوة.", 
-                        img_to_process
-                    ])
-                    
-                    st.markdown("---")
-                    st.markdown("### 💡 رد لمعلم:")
-                    st.markdown(f'<div class="answer-box">{response.text}</div>', unsafe_allow_html=True)
-                else:
-                    st.error("❌ عذراً، كاين مشكل فالسيرفر.")
+                st.markdown(f'<div class="chat-message teacher-msg">{full_response}</div>', unsafe_allow_html=True)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                
             except Exception as e:
                 st.error(f"وقع مشكل: {e}")
 
-st.markdown("<br><hr><center><small>Ibravolt - El Jadida 2026</small></center>", unsafe_allow_html=True)
+st.sidebar.markdown("---")
+if st.sidebar.button("تمسح الحوار؟"):
+    st.session_state.messages = []
+    st.rerun()
