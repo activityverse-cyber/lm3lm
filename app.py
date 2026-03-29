@@ -6,7 +6,7 @@ from PIL import Image
 API_KEY = "AIzaSyA8xWX9xME_mIu2XccX0h2iNG8Qa-Rr1Pk"
 genai.configure(api_key=API_KEY)
 
-# تحديد الموديل (Gemini 1.5 Flash هو اللي كيقرا التصاور بذكاء)
+# تحديد الموديل (Gemini 2.5 Flash هو اللي كيقرا التصاور بذكاء)
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 # 2. تصميم الواجهة (UI) لـ تطبيق "لمعلم"
@@ -50,6 +50,6 @@ if uploaded_file:
                 
             except Exception as e:
                 st.error(f"وقع مشكل تقني: {e}")
-                st.info("تأكد بلي الـ API Key مفعل فيه Gemini 1.5 Flash فـ Google AI Studio.")
+                st.info("تأكد بلي الـ API Key مفعل فيه Gemini 2.5 Flash فـ Google AI Studio.")
 
 st.markdown("<br><hr><center><small>مشروع LM3LM - الجديدة 2026</small></center>", unsafe_allow_html=True)
