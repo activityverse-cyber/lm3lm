@@ -1,55 +1,55 @@
 import streamlit as st
-import requests
-import base64
+import google.generativeai as genai
+from PIL import Image
 
-# 1. الإعدادات
-API_KEY = "AIzaSyB4KsUP8EVImF8dhkFs2Bcln6e206o7nHk"
+# 1. إعداد المفتاح (API KEY) اللي عطيتيني
+API_KEY = "AIzaSyA8xWX9xME_mIu2XccX0h2iNG8Qa-Rr1Pk"
+genai.configure(api_key=API_KEY)
 
-def get_response(model_name, img_data, level, subject):
-    # جربنا v1 و v1beta، دابا غانخدمو بـ v1 اللي هي الرسمية فـ 2026
-    url = f"https://generativelanguage.googleapis.com/v1/models/{model_name}:generateContent?key={API_KEY}"
-    payload = {
-        "contents": [{
-            "parts": [
-                {"text": f"أنت 'لمعلم' خبير تعليمي مغربي. اشرح للتلميذ هذا التمرين (مستوى {level} مادة {subject}) بالدارجة المغربية بأسلوب مشجع ولا تعطه الحل مباشرة."},
-                {"inline_data": {"mime_type": "image/jpeg", "data": img_data}}
-            ]
-        }]
-    }
-    return requests.post(url, json=payload)
+# تحديد الموديل (Gemini 1.5 Flash هو اللي كيقرا التصاور بذكاء)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
-st.set_page_config(page_title="LM3LM", layout="centered")
+# 2. تصميم الواجهة (UI) لـ تطبيق "لمعلم"
+st.set_page_config(page_title="LM3LM - لملم", page_icon="👨‍🏫", layout="centered")
+
+# ستايل مغربي خفيف
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Tajawal', sans-serif; direction: rtl; text-align: right; }
+    .stButton>button { background: linear-gradient(90deg, #1e3c72, #2a5298); color: white; border-radius: 20px; width: 100%; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.title("👨‍🏫 تطبيق LM3LM (لمعلم)")
+st.write("المساعد الدراسي الذكي للتلاميذ 🇲🇦 - نسخة 2026")
 
-level = st.selectbox("🎯 المستوى:", ["الابتدائي", "الإعدادي"])
-subject = st.selectbox("📚 المادة:", ["الرياضيات", "الفيزياء", "اللغات", "النشاط العلمي"])
+# الاختيارات (المستوى والمادة)
+level = st.selectbox("🎯 المستوى الدراسي:", ["الابتدائي", "الإعدادي"])
+subject = st.selectbox("📚 المادة:", ["الرياضيات", "الفيزياء والكيمياء", "اللغات", "النشاط العلمي"])
 
-uploaded_file = st.file_uploader("📸 صور التمرين...", type=["jpg", "jpeg", "png"])
+# تحميل صورة التمرين
+uploaded_file = st.file_uploader("📸 صور التمرين وحطو هنا...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
-    st.image(uploaded_file, use_container_width=True)
-    
+    image = Image.open(uploaded_file)
+    st.image(image, caption='التمرين اللي بغيتي تشرحو', use_container_width=True)
+
     if st.button("يا لمعلم، شوف ليا هادشي"):
-        with st.spinner('جاري محاولة الاتصال بالسيرفر...'):
+        with st.spinner('لمعلم كيقرا التمرين ويوجد الشرح...'):
             try:
-                img_data = base64.b64encode(uploaded_file.read()).decode("utf-8")
+                # البرومت الاحترافي بالدارجة
+                instruction = f"أنت 'لمعلم' خبير تعليمي مغربي. اشرح للتلميذ (مستوى {level} مادة {subject}) هذا التمرين بالدارجة المغربية بأسلوب مشجع ومبسط. لا تعطه الحل النهائي مباشرة، بل وجهه للحل خطوة بخطوة."
                 
-                # المحاولة الأولى بـ gemini-1.5-flash
-                res = get_response("gemini-1.5-flash", img_data, level, subject)
+                # إرسال الطلب لـ Gemini
+                response = model.generate_content([instruction, image])
                 
-                # إلا عطى 404، جرب النسخة الاحتياطية gemini-pro-vision
-                if res.status_code == 404:
-                    res = get_response("gemini-pro-vision", img_data, level, subject)
+                st.markdown("---")
+                st.markdown("### 💡 رد لمعلم:")
+                st.success(response.text)
                 
-                result = res.json()
-                
-                if "candidates" in result:
-                    st.success(result['candidates'][0]['content']['parts'][0]['text'])
-                else:
-                    st.error(f"مشكل فالسيرفر: {result.get('error', {}).get('message', 'خطأ غير معروف')}")
-                    st.info("نصيحة: تأكد من تفعيل الموديل في Google AI Studio.")
-                    
             except Exception as e:
                 st.error(f"وقع مشكل تقني: {e}")
+                st.info("تأكد بلي الـ API Key مفعل فيه Gemini 1.5 Flash فـ Google AI Studio.")
 
-st.markdown("<hr><center>LM3LM Project - 2026</center>", unsafe_allow_html=True)
+st.markdown("<br><hr><center><small>مشروع LM3LM - الجديدة 2026</small></center>", unsafe_allow_html=True)
