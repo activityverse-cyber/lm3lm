@@ -1,8 +1,9 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
+import hashlib
 
-# 1. الستايل الاحترافي (RTL 100%)
+# 1. الستايل الاحترافي (Premium RTL UI)
 st.set_page_config(page_title="LM3LM Pro", page_icon="👨‍🏫", layout="centered")
 
 st.markdown("""
@@ -13,79 +14,70 @@ st.markdown("""
         direction: rtl !important;
         text-align: right !important;
     }
-    .stChatMessage { direction: rtl !important; text-align: right !important; }
-    p, span, div, label, .stMarkdown { color: #1e3c72 !important; direction: rtl !important; text-align: right !important; }
-    .assistant-style { background-color: #ffffff; border-right: 5px solid #1e3c72; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; }
-    .user-style { background-color: #e3f2fd; border-right: 5px solid #2196f3; padding: 15px; border-radius: 10px; width: 100%; }
+    /* تنسيق فقاعات الحوار */
+    .stChatMessage { direction: rtl !important; text-align: right !important; border-radius: 15px; }
+    .assistant-bubble { background-color: #ffffff; border-right: 5px solid #1e3c72; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); color: #1e3c72 !important; }
+    .user-bubble { background-color: #e3f2fd; border-right: 5px solid #2196f3; padding: 15px; border-radius: 10px; color: #0d47a1 !important; }
+    /* تحسين الهيدر */
+    .hero { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. الربط والبحث عن الموديل
+# 2. إعداد الموديل
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
-    @st.cache_resource
-    def get_working_model():
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        flash = [m for m in models if "flash" in m]
-        return flash[0] if flash else models[0]
-    WORKING_MODEL = get_working_model()
-except Exception as e:
-    st.error(f"⚠️ مشكل فـ الساروت: {e}")
+    # استعملنا 1.5-flash حيت كوطا ديالو كبيرة
+    model = genai.GenerativeModel("gemini-1.5-flash")
+except:
+    st.error("⚠️ الساروت ناقص فـ Secrets!")
     st.stop()
 
-# 3. الذاكرة
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+if "messages" not in st.session_state: st.session_state.messages = []
+if "last_processed_hash" not in st.session_state: st.session_state.last_processed_hash = ""
 
-# الواجهة
-st.markdown('<h1 style="text-align: center;">👨‍🏫 تطبيق LM3LM - لمعلم</h1>', unsafe_allow_html=True)
+# 3. الواجهة الرئيسية
+st.markdown('<div class="hero"><h1>👨‍🏫 LM3LM - لمعلم</h1><p>صور تمرينك.. "لمعلم" يحلّو ليك</p></div>', unsafe_allow_html=True)
 
-# عرض الحوار القديم
 for msg in st.session_state.messages:
-    style = "user-style" if msg["role"] == "user" else "assistant-style"
+    style = "user-bubble" if msg["role"] == "user" else "assistant-bubble"
     with st.chat_message(msg["role"]):
         st.markdown(f'<div class="{style}">{msg["content"]}</div>', unsafe_allow_html=True)
 
 # 4. أدوات الإدخال
 with st.sidebar:
     st.header("🛠️ الأدوات")
-    uploaded_file = st.sidebar.file_uploader("📸 ارفع صورة التمرين", type=["jpg", "jpeg", "png"])
-    if st.sidebar.button("🗑️ مسح الحوار"):
+    uploaded_file = st.file_uploader("📸 ارفع صورة التمرين", type=["jpg", "jpeg", "png"])
+    if st.button("🗑️ مسح الحوار"):
         st.session_state.messages = []
+        st.session_state.last_processed_hash = ""
         st.rerun()
 
-prompt = st.chat_input("اسأل 'لمعلم' هنا...")
+prompt = st.chat_input("اكتب سؤالك هنا...")
 
 # 5. المنطق: "الديجونكتور" ضد التكرار (The Pro Logic)
 if prompt or uploaded_file:
-    # تحديد محتوى السؤال الحالي
-    current_query = prompt if prompt else "شرح ليا هاد التمرين من الصورة"
-    
-    # "التستور": كنشوفو واش هاد السؤال فايت جاوبنا عليه فـ آخر رسالة
-    is_already_asked = False
-    if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
-        # إلا كان آخر حاجة هي جواب المعلم، كنشوفو السؤال اللي قبلو
-        if len(st.session_state.messages) >= 2:
-            if st.session_state.messages[-2]["content"] == current_query:
-                is_already_asked = True
-    elif st.session_state.messages and st.session_state.messages[-1]["content"] == current_query:
-        is_already_asked = True
+    # صناعة "بصمة" (Hash) فريدة للسؤال الحالي
+    current_input_str = f"{prompt}_{uploaded_file.name if uploaded_file else ''}"
+    current_hash = hashlib.md5(current_input_str.encode()).hexdigest()
 
-    # إلا كان السؤال جديد، عاد نخدمو "الماكينة"
-    if not is_already_asked:
-        st.session_state.messages.append({"role": "user", "content": current_query})
+    # إذا كانت البصمة مختلفة عن آخر مرة، عاد نجاوبو
+    if current_hash != st.session_state.last_processed_hash:
+        user_text = prompt if prompt else "شرح ليا هاد التمرين"
+        st.session_state.messages.append({"role": "user", "content": user_text})
         
         with st.chat_message("assistant"):
-            with st.spinner("لمعلم كيشوف الحل..."):
+            with st.spinner("لمعلم كيفكر..."):
                 try:
-                    model = genai.GenerativeModel(WORKING_MODEL)
-                    parts = ["أنت 'لمعلم' خبير مغربي. جاوب بالدارجة المغربية باختصار وبأسلوب مشجع. ابدأ من اليمين."]
+                    parts = ["أنت 'لمعلم' خبير مغربي. جاوب بالدارجة باختصار وبأسلوب مشجع ومقاد من اليمين."]
                     if prompt: parts.append(prompt)
                     if uploaded_file: parts.append(Image.open(uploaded_file))
                     
                     response = model.generate_content(parts)
-                    st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    st.rerun() # تحديث أخير باش نحبسو الـ Loop
+                    answer = response.text
+                    
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                    st.session_state.last_processed_hash = current_hash # قيدنا البصمة باش ما يتعاودش
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"مشكل تقني: {e}")
+                    st.error(f"مشكل: {e}")
