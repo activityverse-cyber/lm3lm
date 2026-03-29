@@ -1,10 +1,8 @@
 import streamlit as st
-import requests
-import base64
+import google.generativeai as genai
 from PIL import Image
-import io
 
-# 1. الستايل الاحترافي (Premium UI)
+# 1. الستايل الاحترافي (Premium UI) - من اليمين لليسر
 st.set_page_config(page_title="LM3LM Pro", page_icon="👨‍🏫", layout="centered")
 
 st.markdown("""
@@ -15,24 +13,32 @@ st.markdown("""
     .bubble { max-width: 85%; padding: 15px; border-radius: 18px; margin-bottom: 10px; line-height: 1.6; display: inline-block; }
     .user-bubble { background-color: #e3f2fd; color: #0d47a1; float: right; border-bottom-right-radius: 4px; border-right: 5px solid #2196f3; }
     .ai-bubble { background-color: white; color: #1e3c72; float: left; border-bottom-left-radius: 4px; border-right: 5px solid #1e3c72; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .stChatInput { direction: rtl !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. إعداد الرابط المباشر (Direct API)
+# 2. الربط بالساروت وبحث تلقائي عن الموديل (الرادار)
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
-    # استعملنا v1 (النسخة المستقرة) اللي مافيهاش 404
-    API_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={API_KEY}"
-except:
-    st.error("⚠️ الساروت GOOGLE_API_KEY ناقص فـ Secrets!")
+    genai.configure(api_key=API_KEY)
+    
+    # دالة ذكية كتجبد الموديل اللي خدام دابا فعليا فالسيرفر
+    @st.cache_resource
+    def get_working_model():
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        # كنقلبو على اللي فيه flash حيت هو الأسرع للكوطا المجانية
+        flash_models = [m for m in models if "flash" in m]
+        return flash_models[0] if flash_models else models[0]
+    
+    WORKING_MODEL = get_working_model()
+except Exception as e:
+    st.error(f"⚠️ مشكل فـ الساروت أو الاتصال: {e}")
     st.stop()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # 3. الواجهة
-st.markdown('<div class="hero-section"><h1>👨‍🏫 LM3LM - لمعلم</h1><p>ذكاء اصطناعي مغربي نقي ومسكد 🇲🇦</p></div>', unsafe_allow_html=True)
+st.markdown(f'<div class="hero-section"><h1>👨‍🏫 LM3LM - لمعلم</h1><p>الموديل النشط: {WORKING_MODEL}</p></div>', unsafe_allow_html=True)
 
 for msg in st.session_state.messages:
     style = "user-bubble" if msg["role"] == "user" else "ai-bubble"
@@ -48,7 +54,7 @@ with st.sidebar:
 
 prompt = st.chat_input("اسأل 'لمعلم' هنا...")
 
-# 5. منطق الإرسال (The Pro Direct Connection)
+# 5. منطق المعالجة
 if prompt or uploaded_file:
     user_text = prompt if prompt else "شرح ليا هاد التمرين"
     
@@ -56,27 +62,22 @@ if prompt or uploaded_file:
         st.session_state.messages.append({"role": "user", "content": user_text})
         
         with st.chat_message("assistant"):
-            with st.spinner("لمعلم كيجاوب دبا..."):
+            with st.spinner("لمعلم كيشوف الحل..."):
                 try:
-                    # تحضير البيانات
-                    parts = [{"text": f"أنت 'لمعلم' خبير مغربي. جاوب بالدارجة باختصار ومفيد. سؤاله: {user_text}"}]
+                    model = genai.GenerativeModel(WORKING_MODEL)
+                    parts = ["أنت 'لمعلم' خبير تعليمي مغربي. جاوب بالدارجة المغربية بأسلوب مشجع ومبسط جداً."]
+                    if prompt: parts.append(prompt)
+                    if uploaded_file: parts.append(Image.open(uploaded_file))
                     
-                    if uploaded_file:
-                        img_data = base64.b64encode(uploaded_file.getvalue()).decode("utf-8")
-                        parts.append({"inline_data": {"mime_type": "image/jpeg", "data": img_data}})
+                    response = model.generate_content(parts)
+                    answer = response.text
                     
-                    # طلب مباشر للسيرفر
-                    payload = {"contents": [{"parts": parts}]}
-                    response = requests.post(API_URL, json=payload)
-                    result = response.json()
-
-                    if "candidates" in result:
-                        answer = result['candidates'][0]['content']['parts'][0]['text']
-                        st.session_state.messages.append({"role": "assistant", "content": answer})
-                        st.rerun()
-                    else:
-                        st.error(f"مشكل فالسيرفر: {result.get('error', {}).get('message', 'خطأ غير معروف')}")
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"وقع مشكل تقني: {e}")
+                    if "404" in str(e):
+                        st.error("🚫 هاد الموديل مابقاش خدام فالسيرفر، عاود جرب مورا شوية غايتبدل الموديل بوحدو.")
+                    else:
+                        st.error(f"مشكل تقني: {e}")
 
-st.markdown("<br><center><small>Ibravolt Digital - El Jadida 2026</small></center>", unsafe_allow_html=True)
+st.markdown("<br><center><small>Ibravolt Digital - 2026</small></center>", unsafe_allow_html=True)
