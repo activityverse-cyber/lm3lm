@@ -1,89 +1,166 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
-import hashlib
+import base64
 
-# 1. الستايل الاحترافي (RTL 100% & Premium UI)
-st.set_page_config(page_title="LM3LM Pro", page_icon="👨‍🏫", layout="centered")
+# 1. إعدادات الصفحة
+st.set_page_config(page_title="LM3LM - ScanToSolve", page_icon="👨‍🏫", layout="wide")
 
+# 2. كود CSS "الحريفي" لقلب الموازين
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
-    html, body, [class*="css"], .stApp {
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;700&display=swap');
+    
+    html, body, [class*="css"] {
         font-family: 'Vazirmatn', sans-serif !important;
         direction: rtl !important;
-        text-align: right !important;
-        background-color: #f8f9fa;
+        background-color: #fcfdfe !important;
     }
-    .stChatMessage { direction: rtl !important; text-align: right !important; }
-    .assistant-bubble { background-color: #ffffff; border-right: 5px solid #1e3c72; padding: 15px; border-radius: 12px; color: #1e3c72 !important; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-    .user-bubble { background-color: #e3f2fd; border-right: 5px solid #2196f3; padding: 15px; border-radius: 12px; color: #0d47a1 !important; }
-    .hero { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 20px; }
+
+    /* هيدر النقط (Credits) */
+    .top-bar {
+        display: flex;
+        justify-content: flex-end;
+        padding: 10px 20px;
+    }
+    .credits-tag {
+        background: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        border: 1px solid #eee;
+        font-weight: bold;
+        color: #ffa502;
+    }
+
+    /* كارت الخطة المجانية */
+    .plan-card {
+        background: #ffffff;
+        border-radius: 20px;
+        padding: 20px;
+        margin: 20px auto;
+        max-width: 800px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid #f0f0f0;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+    }
+    .btn-premium {
+        background-color: #00b894;
+        color: white;
+        border: none;
+        padding: 10px 25px;
+        border-radius: 12px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    /* قسم اختيار المواد */
+    .section-title { margin: 30px auto 20px; max-width: 800px; font-weight: bold; color: #2d3436; }
+    
+    .subject-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        max-width: 800px;
+        margin: 0 auto 30px;
+    }
+    .subject-item {
+        background: white;
+        border: 2px solid #f0f0f0;
+        border-radius: 15px;
+        padding: 25px 10px;
+        text-align: center;
+        transition: 0.3s;
+        cursor: pointer;
+    }
+    .subject-item:hover { border-color: #00b894; transform: translateY(-3px); }
+    .subject-item.active { border-color: #00b894; background: #f0fffb; }
+    .sub-icon { font-size: 28px; margin-bottom: 10px; display: block; }
+
+    /* منطقة الرفع (The Large Drop Zone) */
+    .drop-zone {
+        background: white;
+        border: 2px dashed #dfe6e9;
+        border-radius: 20px;
+        padding: 60px 20px;
+        text-align: center;
+        max-width: 800px;
+        margin: 0 auto;
+        color: #636e72;
+    }
+    .upload-icon { font-size: 50px; color: #00b894; margin-bottom: 15px; }
+
+    /* إخفاء واجهة ستريمليت الأصلية */
+    [data-testid="stFileUploader"] {
+        display: flex;
+        justify-content: center;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. الربط الذكي بالساروت (الرادار)
-try:
-    API_KEY = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=API_KEY)
-    
-    @st.cache_resource
-    def find_working_model():
-        # كيسول السيرفر على الموديلات اللي خدامين عندك دابا فعلياً
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        flash_models = [m for m in models if "flash" in m]
-        return flash_models[0] if flash_models else models[0]
-    
-    WORKING_MODEL = find_working_model()
-except Exception as e:
-    st.error(f"⚠️ مشكل فـ الساروت أو الاتصال: {e}")
-    st.stop()
+# 3. الهيدر العلوي
+st.markdown("""
+    <div class="top-bar">
+        <div class="credits-tag">⚡ رصيد اليوم: 1</div>
+    </div>
+    <div class="plan-card">
+        <div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div style="background:#e6fcf5; padding:10px; border-radius:12px;">⚡</div>
+                <div>
+                    <b style="font-size:16px;">الخطة المجانية</b><br>
+                    <small style="color:#636e72;">تمرين واحد متبقي اليوم</small>
+                </div>
+            </div>
+        </div>
+        <button class="btn-premium">الترقية لـ Premium</button>
+    </div>
+    """, unsafe_allow_html=True)
 
-if "messages" not in st.session_state: st.session_state.messages = []
-if "last_hash" not in st.session_state: st.session_state.last_hash = ""
+# 4. اختيار المادة (Grid)
+st.markdown('<div class="section-title">اختر المادة</div>', unsafe_allow_html=True)
+st.markdown("""
+    <div class="subject-grid">
+        <div class="subject-item active">
+            <span class="sub-icon">📊</span>
+            <b>رياضيات</b>
+        </div>
+        <div class="subject-item">
+            <span class="sub-icon">⚛️</span>
+            <b>فيزياء</b>
+        </div>
+        <div class="subject-item">
+            <span class="sub-icon">🧪</span>
+            <b>كيمياء</b>
+        </div>
+        <div class="subject-item">
+            <span class="sub-icon">📚</span>
+            <b>أخرى</b>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# 3. الواجهة الرئيسية
-st.markdown(f'<div class="hero"><h1>👨‍🏫 LM3LM - لمعلم</h1><p>ذكاء اصطناعي مغربي مسكد 🇲🇦</p></div>', unsafe_allow_html=True)
+# 5. منطقة الرفع (The Functional Part)
+st.markdown('<div class="section-title">استيراد التمرين</div>', unsafe_allow_html=True)
 
-for msg in st.session_state.messages:
-    style = "user-bubble" if msg["role"] == "user" else "assistant-bubble"
-    with st.chat_message(msg["role"]):
-        st.markdown(f'<div class="{style}">{msg["content"]}</div>', unsafe_allow_html=True)
+# غانحطو الـ Uploader الحقيقي فوق الديكور بـ ستايل مخفي
+uploaded_file = st.file_uploader("", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
 
-# 4. أدوات الإدخال (Sidebar)
-with st.sidebar:
-    st.header("🛠️ الأدوات")
-    uploaded_file = st.file_uploader("📸 ارفع صورة التمرين", type=["jpg", "jpeg", "png"])
-    if st.button("🗑️ مسح الحوار"):
-        st.session_state.messages = []
-        st.session_state.last_hash = ""
-        st.rerun()
+if not uploaded_file:
+    st.markdown("""
+        <div class="drop-zone">
+            <div class="upload-icon">📤</div>
+            <h3>استورد تمرينك</h3>
+            <p>اضغط هنا أو اسحب الصورة<br><small>PNG, JPG حتى 10MB</small></p>
+        </div>
+        """, unsafe_allow_html=True)
+else:
+    st.image(uploaded_file, caption="التمرين جاهز للتحليل", use_container_width=True)
+    if st.button("يا لمعلم، عطيني الحل", use_container_width=True):
+        with st.spinner("لمعلم كيشوف فـ الورقة..."):
+            # هنا كيدخل كود الذكاء الاصطناعي ديالنا
+            st.info("لمعلم كيقرا دابا.. الجواب غايطلع هنا!")
 
-prompt = st.chat_input("اكتب سؤالك هنا...")
-
-# 5. المنطق: منع التكرار ومعالجة الطلب
-if prompt or uploaded_file:
-    # بصمة رقمية (Hash) باش نعرفو واش السؤال تعاود
-    current_input = f"{prompt}_{uploaded_file.name if uploaded_file else ''}"
-    current_hash = hashlib.md5(current_input.encode()).hexdigest()
-
-    if current_hash != st.session_state.last_hash:
-        user_text = prompt if prompt else "شرح ليا هاد التمرين"
-        st.session_state.messages.append({"role": "user", "content": user_text})
-        
-        with st.chat_message("assistant"):
-            with st.spinner("لمعلم كيشوف الحل..."):
-                try:
-                    model = genai.GenerativeModel(WORKING_MODEL)
-                    parts = ["أنت 'لمعلم' خبير مغربي. جاوب بالدارجة المغربية باختصار وبأسلوب مشجع. ابدأ دائماً من اليمين."]
-                    if prompt: parts.append(prompt)
-                    if uploaded_file: parts.append(Image.open(uploaded_file))
-                    
-                    response = model.generate_content(parts)
-                    answer = response.text
-                    
-                    st.session_state.messages.append({"role": "assistant", "content": answer})
-                    st.session_state.last_hash = current_hash
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"مشكل تقني: {e}")
+st.markdown("<br><br><center><small>Ibravolt Digital Solution - El Jadida 2026</small></center>", unsafe_allow_html=True)
