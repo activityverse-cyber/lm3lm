@@ -2,80 +2,111 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. الستايل الاحترافي (Pro UI) - مقاد للتليفون وللعربية
+# 1. الستايل الاحترافي - إجبار RTL (اليمين لليسار)
 st.set_page_config(page_title="LM3LM Pro", page_icon="👨‍🏫", layout="wide")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Vazirmatn', sans-serif; direction: rtl; text-align: right; background-color: #f4f7f9; }
-    .main-header { background: linear-gradient(90deg, #1e3c72, #2a5298); color: white; padding: 1.5rem; border-radius: 15px; text-align: center; margin-bottom: 2rem; }
-    .stChatMessage { border-radius: 15px; padding: 1rem; margin-bottom: 1rem; direction: rtl !important; }
-    .assistant-style { background-color: #ffffff; border-right: 5px solid #1e3c72; color: #1e3c72 !important; padding: 15px; border-radius: 10px; }
-    .user-style { background-color: #e3f2fd; border-right: 5px solid #2196f3; color: #0d47a1 !important; padding: 15px; border-radius: 10px; }
+    
+    /* فرض الاتجاه من اليمين لليسر على التطبيق كامل */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Vazirmatn', sans-serif !important;
+        direction: rtl !important;
+        text-align: right !important;
+    }
+
+    /* تنسيق فقاعات الحوار */
+    .stChatMessage {
+        direction: rtl !important;
+        text-align: right !important;
+        margin-left: 0 !important;
+        margin-right: auto !important;
+    }
+
+    /* لون الخط (أزرق غامق) باش يبان واضح */
+    p, span, div, label {
+        color: #1e3c72 !important;
+    }
+
+    /* تنسيق صندوق الرد (لمعلم) */
+    .assistant-bubble {
+        background-color: #ffffff;
+        border-right: 5px solid #1e3c72;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* تنسيق صندوق السؤال (التلميذ) */
+    .user-bubble {
+        background-color: #e3f2fd;
+        border-right: 5px solid #2196f3;
+        padding: 15px;
+        border-radius: 10px;
+    }
+
+    /* قاد صندوق الكتابة (Input) لتحت */
+    .stChatInput textarea {
+        direction: rtl !important;
+        text-align: right !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. الربط بالساروت والبحث عن الموديل (الرادار)
+# 2. الربط بالساروت والبحث عن الموديل
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
     
-    # دالة ذكية كتقلب على الموديل اللي خدام دابا فالسيرفر
     @st.cache_resource
-    def find_best_model():
+    def find_working_model():
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        # كنقلبو على اللي فيه flash هو الأول حيت هو الأسرع
-        flash_models = [m for m in models if "flash" in m]
-        return flash_models[0] if flash_models else models[0]
+        flash = [m for m in models if "flash" in m]
+        return flash[0] if flash else models[0]
     
-    WORKING_MODEL = find_best_model()
+    WORKING_MODEL = find_working_model()
 except Exception as e:
-    st.error(f"⚠️ مشكل فـ الربط مع Google: {e}")
+    st.error("⚠️ مشكل فالساروت!")
     st.stop()
+
+# 3. واجهة التطبيق
+st.markdown("<h1 style='text-align: center;'>👨‍🏫 تطبيق LM3LM - لمعلم</h1>", unsafe_allow_html=True)
+st.write("<center>مساعدك الدراسي الذكي بالدارجة المغربية 🇲🇦</center>", unsafe_allow_html=True)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 3. الواجهة الرئيسية
-st.markdown('<div class="main-header"><h1>👨‍🏫 LM3LM - لمعلم</h1><p>الموديل النشط: '+WORKING_MODEL+'</p></div>', unsafe_allow_html=True)
-
 # عرض الحوار
 for msg in st.session_state.messages:
-    style_class = "user-style" if msg["role"] == "user" else "assistant-style"
     with st.chat_message(msg["role"]):
-        st.markdown(f'<div class="{style_class}">{msg["content"]}</div>', unsafe_allow_html=True)
+        style = "user-bubble" if msg["role"] == "user" else "assistant-bubble"
+        st.markdown(f'<div class="{style}">{msg["content"]}</div>', unsafe_allow_html=True)
 
 # 4. منطقة الإدخال
 uploaded_file = st.sidebar.file_uploader("➕ ارفع صورة التمرين", type=["jpg", "png", "jpeg"])
-prompt = st.chat_input("اسأل 'لمعلم' عن أي تمرين...")
+prompt = st.chat_input("اسأل 'لمعلم' هنا...")
 
-# 5. منطق المعالجة
 if prompt or uploaded_file:
     user_text = prompt if prompt else "شرح ليا هاد التمرين"
     
-    # التأكد بلي السؤال جديد
+    # منع التكرار
     if not st.session_state.messages or st.session_state.messages[-1]["content"] != user_text:
         st.session_state.messages.append({"role": "user", "content": user_text})
         
         with st.chat_message("assistant"):
-            with st.spinner("لمعلم كيشوف الحل..."):
+            with st.spinner("لمعلم كيجاوب..."):
                 try:
                     model = genai.GenerativeModel(WORKING_MODEL)
-                    parts = ["أنت 'لمعلم' خبير تعليمي مغربي. جاوب بالدارجة المغربية بأسلوب مشجع ومبسط جداً."]
+                    parts = ["أنت 'لمعلم' خبير مغربي. جاوب بالدارجة المغربية باختصار وبأسلوب مشجع ومقاد من اليمين."]
                     if prompt: parts.append(prompt)
                     if uploaded_file: parts.append(Image.open(uploaded_file))
                     
                     response = model.generate_content(parts)
-                    answer = response.text
-                    
-                    st.session_state.messages.append({"role": "assistant", "content": answer})
-                    st.markdown(f'<div class="assistant-style">{answer}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="assistant-bubble">{response.text}</div>', unsafe_allow_html=True)
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
                     st.rerun()
                 except Exception as e:
-                    st.error(f"وقع مشكل تقني: {e}")
+                    st.error(f"خطأ: {e}")
 
-st.sidebar.markdown("---")
-if st.sidebar.button("🗑️ مسح الحوار"):
-    st.session_state.messages = []
-    st.rerun()
+st.sidebar.button("🗑️ مسح الحوار", on_click=lambda: st.session_state.clear())
