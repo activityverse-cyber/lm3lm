@@ -2,17 +2,59 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. الستايل الاحترافي (Premium UI) - من اليمين لليسر
+# 1. الستايل "الاحترافي" - إجبار الاتجاه من اليمين لليسر (RTL)
 st.set_page_config(page_title="LM3LM Pro", page_icon="👨‍🏫", layout="centered")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Vazirmatn', sans-serif !important; direction: rtl !important; text-align: right; background-color: #f8f9fa; }
-    .hero-section { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 30px; border-radius: 20px; text-align: center; margin-bottom: 25px; }
-    .bubble { max-width: 85%; padding: 15px; border-radius: 18px; margin-bottom: 10px; line-height: 1.6; display: inline-block; }
-    .user-bubble { background-color: #e3f2fd; color: #0d47a1; float: right; border-bottom-right-radius: 4px; border-right: 5px solid #2196f3; }
-    .ai-bubble { background-color: white; color: #1e3c72; float: left; border-bottom-left-radius: 4px; border-right: 5px solid #1e3c72; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    
+    /* فرض اليمين على الصفحة كاملة */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Vazirmatn', sans-serif !important;
+        direction: rtl !important;
+        text-align: right !important;
+    }
+
+    /* تقاد الفقاعات ديال الشات باش يبداو من اليمين */
+    .stChatMessage {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+
+    /* لون الخط أزرق غامق باش يبان واضح مع الخلفية */
+    p, span, div, label, .stMarkdown {
+        color: #1e3c72 !important;
+        direction: rtl !important;
+        text-align: right !important;
+    }
+
+    /* ستايل "لمعلم" (الرد) */
+    .assistant-style {
+        background-color: #ffffff;
+        border-right: 5px solid #1e3c72;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: block;
+        width: 100%;
+    }
+
+    /* ستايل "التلميذ" (السؤال) */
+    .user-style {
+        background-color: #e3f2fd;
+        border-right: 5px solid #2196f3;
+        padding: 15px;
+        border-radius: 10px;
+        display: block;
+        width: 100%;
+    }
+
+    /* قاد صندوق الكتابة (Input) */
+    .stChatInput textarea {
+        direction: rtl !important;
+        text-align: right !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -21,28 +63,28 @@ try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
     
-    # دالة ذكية كتجبد الموديل اللي خدام دابا فعليا فالسيرفر
     @st.cache_resource
     def get_working_model():
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        # كنقلبو على اللي فيه flash حيت هو الأسرع للكوطا المجانية
-        flash_models = [m for m in models if "flash" in m]
-        return flash_models[0] if flash_models else models[0]
+        flash = [m for m in models if "flash" in m]
+        return flash[0] if flash else models[0]
     
     WORKING_MODEL = get_working_model()
 except Exception as e:
-    st.error(f"⚠️ مشكل فـ الساروت أو الاتصال: {e}")
+    st.error(f"⚠️ مشكل فـ الساروت: {e}")
     st.stop()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # 3. الواجهة
-st.markdown(f'<div class="hero-section"><h1>👨‍🏫 LM3LM - لمعلم</h1><p>الموديل النشط: {WORKING_MODEL}</p></div>', unsafe_allow_html=True)
+st.markdown('<h1 style="text-align: center; color: #1e3c72;">👨‍🏫 تطبيق LM3LM - لمعلم</h1>', unsafe_allow_html=True)
 
+# عرض الحوار بستايل اليمين
 for msg in st.session_state.messages:
-    style = "user-bubble" if msg["role"] == "user" else "ai-bubble"
-    st.markdown(f'<div style="width:100%; display:flow-root;"><div class="bubble {style}">{msg["content"]}</div></div>', unsafe_allow_html=True)
+    style = "user-style" if msg["role"] == "user" else "assistant-style"
+    with st.chat_message(msg["role"]):
+        st.markdown(f'<div class="{style}">{msg["content"]}</div>', unsafe_allow_html=True)
 
 # 4. أدوات الإدخال
 with st.sidebar:
@@ -54,7 +96,7 @@ with st.sidebar:
 
 prompt = st.chat_input("اسأل 'لمعلم' هنا...")
 
-# 5. منطق المعالجة
+# 5. منطق المعالجة (بلا تغيير)
 if prompt or uploaded_file:
     user_text = prompt if prompt else "شرح ليا هاد التمرين"
     
@@ -65,7 +107,8 @@ if prompt or uploaded_file:
             with st.spinner("لمعلم كيشوف الحل..."):
                 try:
                     model = genai.GenerativeModel(WORKING_MODEL)
-                    parts = ["أنت 'لمعلم' خبير تعليمي مغربي. جاوب بالدارجة المغربية بأسلوب مشجع ومبسط جداً."]
+                    # وصية للمعلم باش يحترم اليمين فالهضرة
+                    parts = ["أنت 'لمعلم' خبير مغربي. جاوب بالدارجة المغربية باختصار وبأسلوب مشجع. ابدأ دائماً من اليمين."]
                     if prompt: parts.append(prompt)
                     if uploaded_file: parts.append(Image.open(uploaded_file))
                     
@@ -75,9 +118,6 @@ if prompt or uploaded_file:
                     st.session_state.messages.append({"role": "assistant", "content": answer})
                     st.rerun()
                 except Exception as e:
-                    if "404" in str(e):
-                        st.error("🚫 هاد الموديل مابقاش خدام فالسيرفر، عاود جرب مورا شوية غايتبدل الموديل بوحدو.")
-                    else:
-                        st.error(f"مشكل تقني: {e}")
+                    st.error(f"مشكل تقني: {e}")
 
 st.markdown("<br><center><small>Ibravolt Digital - 2026</small></center>", unsafe_allow_html=True)
