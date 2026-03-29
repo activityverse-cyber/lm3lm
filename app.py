@@ -2,128 +2,63 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. ستايل "الحريفي" - قاد ألوان الخط والخلفية
-st.set_page_config(page_title="LM3LM - لملم", page_icon="👨‍🏫", layout="centered")
+# ... (نفس الستايل والربط اللي درنا قبل)
 
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
-    
-    /* فرض الألوان باش ما يبقاش الخط أبيض */
-    html, body, [class*="css"] {
-        font-family: 'Tajawal', sans-serif;
-        direction: rtl;
-        text-align: right;
-        color: #1e3c72 !important; /* لون أزرق غامق للخط */
-    }
-
-    .stMarkdown, .stChatMessage, p, li {
-        color: #1e3c72 !important;
-        direction: rtl;
-        text-align: right;
-    }
-
-    /* صندوق رد لمعلم - خلفية ملونة وخط واضح */
-    .teacher-bubble {
-        background-color: #f1f8e9; 
-        border-right: 5px solid #4caf50; 
-        padding: 20px; 
-        border-radius: 15px;
-        color: #1b5e20 !important; /* أخضر غامق */
-        margin-bottom: 20px;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-    }
-
-    /* صندوق سؤال التلميذ */
-    .user-bubble {
-        background-color: #e3f2fd;
-        border-right: 5px solid #2196f3;
-        padding: 15px;
-        border-radius: 15px;
-        color: #0d47a1 !important; /* أزرق غامق */
-        margin-bottom: 20px;
-    }
-
-    /* تعديل صندوق الكتابة السفلي */
-    .stChatInput textarea {
-        color: #000000 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# 2. الربط الذكي بالساروت
-try:
-    API_KEY = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=API_KEY)
-except:
-    st.error("⚠️ الساروت GOOGLE_API_KEY ما راكبش!")
-    st.stop()
-
-# الرادار لجلب الموديل الخدام
-@st.cache_resource
-def get_working_model():
-    try:
-        available_models = genai.list_models()
-        for m in available_models:
-            if 'generateContent' in m.supported_generation_methods:
-                if "flash" in m.name: return m.name
-        return "gemini-1.5-flash"
-    except:
-        return "gemini-1.5-flash"
-
-WORKING_MODEL = get_working_model()
-
-# 3. واجهة التطبيق
-st.title("👨‍🏫 تطبيق LM3LM")
-st.write("مساعدك الذكي: صور، تكلم، أو اكتب (بالدارجة 🇲🇦)")
-
-# الأدوات
-col1, col2 = st.columns(2)
-with col1: cam_file = st.camera_input("📸 صور التمرين")
-with col2: upload_file = st.file_uploader("📁 ارفع صورة", type=["jpg", "png", "jpeg"])
-
-audio_file = st.audio_input("🎙️ سجل سؤالك بصوتك")
-
+# 1. إعداد الذاكرة والحالة (Session State)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-st.divider()
+# 2. واجهة التطبيق
+st.title("👨‍🏫 تطبيق LM3LM")
 
-# 4. عرض الحوار بالستايل الجديد
+# الأدوات (صور، رفع، صوت)
+col1, col2 = st.columns(2)
+with col1: cam_file = st.camera_input("📸 صور")
+with col2: upload_file = st.file_uploader("📁 ارفع", type=["jpg", "png", "jpeg"])
+audio_file = st.audio_input("🎙️ سجل")
+
+# عرض الحوار القديم (باش ما يتكررش)
 for msg in st.session_state.messages:
-    if msg["role"] == "user":
-        st.markdown(f'<div class="user-bubble"><b>أنت:</b><br>{msg["content"]}</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="teacher-bubble"><b>لمعلم:</b><br>{msg["content"]}</div>', unsafe_allow_html=True)
+    role_bubble = "user-bubble" if msg["role"] == "user" else "teacher-bubble"
+    st.markdown(f'<div class="{role_bubble}">{msg["content"]}</div>', unsafe_allow_html=True)
 
-# 5. معالجة الإدخال
+# صندوق الكتابة
 prompt = st.chat_input("اكتب سؤالك هنا...")
 
+# 3. المنطق: "الديجونكتور" اللي كيمنع التكرار
+# الجواب كيكون "فقط" إلا ضغطنا على Enter فـ ChatInput أو صورنا حاجة جديدة
 if prompt or cam_file or upload_file or audio_file:
-    user_input = prompt if prompt else "شرح ليا هادشي"
-    st.session_state.messages.append({"role": "user", "content": user_input})
     
-    with st.spinner("لمعلم كيوجد الرد..."):
-        try:
-            model = genai.GenerativeModel(WORKING_MODEL)
-            parts = ["أنت 'لمعلم' خبير مغربي. جاوب بالدارجة المغربية بأسلوب مشجع ومبسط جداً."]
-            if prompt: parts.append(prompt)
-            
-            img = Image.open(cam_file if cam_file else upload_file) if (cam_file or upload_file) else None
-            if img: parts.append(img)
-            
-            if audio_file:
-                parts.append({"mime_type": "audio/wav", "data": audio_file.getvalue()})
+    # تحريفة ذكية: كنشوفو واش هاد السؤال هو نيت اللخر اللي كاين فـ الذاكرة
+    last_msg = st.session_state.messages[-1]["content"] if st.session_state.messages else ""
+    
+    # إلا كان السؤال جديد وماشي تكرار
+    if prompt != last_msg:
+        user_input = prompt if prompt else "شرح ليا هاد التمرين"
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        
+        # كنعاودو نرسمو سؤال المستخدم دغيا
+        st.markdown(f'<div class="user-bubble">{user_input}</div>', unsafe_allow_html=True)
+        
+        with st.spinner("لمعلم كيشوف الحل..."):
+            try:
+                model = genai.GenerativeModel(WORKING_MODEL)
+                # ... (نفس إعدادات التوليد اللي درنا قبل)
+                
+                response = model.generate_content(parts)
+                answer = response.text
+                
+                # حفظ الجواب فـ الذاكرة وعرضه مرة واحدة
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+                st.markdown(f'<div class="teacher-bubble">{answer}</div>', unsafe_allow_html=True)
+                
+                # مهم جداً: كديرو Rerun باش نحبسو أي Loop
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"مشكل تقني: {e}")
 
-            response = model.generate_content(parts)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
-            st.rerun() # باش يتحدث العرض بالألوان الجديدة
-            
-        except Exception as e:
-            st.error(f"مشكل تقني: {e}")
-
+# زر المسح
 if st.button("🗑️ مسح الحوار"):
     st.session_state.messages = []
     st.rerun()
-
-st.markdown("<hr><center><small>Ibravolt - El Jadida 2026</small></center>", unsafe_allow_html=True)
