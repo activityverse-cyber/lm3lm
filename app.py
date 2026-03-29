@@ -1,112 +1,145 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
+import time
 
-# 1. الستايل الاحترافي - إجبار RTL (اليمين لليسار)
-st.set_page_config(page_title="LM3LM Pro", page_icon="👨‍🏫", layout="wide")
+# 1. القالب الجمالي (Advanced CSS)
+st.set_page_config(page_title="LM3LM Pro", page_icon="👨‍🏫", layout="centered")
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;700&display=swap');
     
-    /* فرض الاتجاه من اليمين لليسر على التطبيق كامل */
-    html, body, [class*="css"], .stApp {
+    html, body, [class*="css"] {
         font-family: 'Vazirmatn', sans-serif !important;
         direction: rtl !important;
-        text-align: right !important;
+        text-align: right;
+        background-color: #f0f2f6;
     }
 
-    /* تنسيق فقاعات الحوار */
-    .stChatMessage {
-        direction: rtl !important;
-        text-align: right !important;
-        margin-left: 0 !important;
-        margin-right: auto !important;
+    /* هيدر عصري (Gradient Hero) */
+    .hero-section {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        padding: 40px 20px;
+        border-radius: 20px;
+        text-align: center;
+        margin-bottom: 30px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
     }
 
-    /* لون الخط (أزرق غامق) باش يبان واضح */
-    p, span, div, label {
-        color: #1e3c72 !important;
+    /* فقاعات الشات الاحترافية */
+    .chat-row { display: flex; margin-bottom: 20px; width: 100%; }
+    .row-reverse { flex-direction: row-reverse; }
+    
+    .bubble {
+        max-width: 80%;
+        padding: 15px 20px;
+        border-radius: 20px;
+        font-size: 1.1rem;
+        line-height: 1.5;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
     }
-
-    /* تنسيق صندوق الرد (لمعلم) */
-    .assistant-bubble {
-        background-color: #ffffff;
-        border-right: 5px solid #1e3c72;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    /* تنسيق صندوق السؤال (التلميذ) */
+    
     .user-bubble {
-        background-color: #e3f2fd;
-        border-right: 5px solid #2196f3;
-        padding: 15px;
-        border-radius: 10px;
+        background-color: #2196f3;
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+    
+    .ai-bubble {
+        background-color: white;
+        color: #1e3c72;
+        border-bottom-left-radius: 4px;
+        border-right: 6px solid #1e3c72;
     }
 
-    /* قاد صندوق الكتابة (Input) لتحت */
-    .stChatInput textarea {
-        direction: rtl !important;
-        text-align: right !important;
+    /* تحسين الأزرار */
+    .stButton>button {
+        border-radius: 30px;
+        border: none;
+        background: #1e3c72;
+        color: white;
+        transition: 0.3s;
     }
+    .stButton>button:hover { background: #2a5298; transform: scale(1.02); }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. الربط بالساروت والبحث عن الموديل
-try:
-    API_KEY = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=API_KEY)
-    
-    @st.cache_resource
-    def find_working_model():
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        flash = [m for m in models if "flash" in m]
-        return flash[0] if flash else models[0]
-    
-    WORKING_MODEL = find_working_model()
-except Exception as e:
-    st.error("⚠️ مشكل فالساروت!")
-    st.stop()
-
-# 3. واجهة التطبيق
-st.markdown("<h1 style='text-align: center;'>👨‍🏫 تطبيق LM3LM - لمعلم</h1>", unsafe_allow_html=True)
-st.write("<center>مساعدك الدراسي الذكي بالدارجة المغربية 🇲🇦</center>", unsafe_allow_html=True)
-
+# 2. إعداد "الماكينة" (Model Configuration)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# عرض الحوار
+try:
+    API_KEY = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=API_KEY)
+    # 1.5-flash هو الموديل "الديونامو" لعام 2026
+    model = genai.GenerativeModel("gemini-1.5-flash")
+except Exception as e:
+    st.error("⚠️ الساروت GOOGLE_API_KEY ما راكبش مزيان فـ Secrets")
+    st.stop()
+
+# 3. واجهة المستخدم (UI)
+st.markdown('<div class="hero-section"><h1>👨‍🏫 LM3LM - لمعلم</h1><p>ذكاء اصطناعي بلمسة "حريفية" مغربية 🇲🇦</p></div>', unsafe_allow_html=True)
+
+# عرض سجل الحوار بستايل نظيف
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        style = "user-bubble" if msg["role"] == "user" else "assistant-bubble"
-        st.markdown(f'<div class="{style}">{msg["content"]}</div>', unsafe_allow_html=True)
-
-# 4. منطقة الإدخال
-uploaded_file = st.sidebar.file_uploader("➕ ارفع صورة التمرين", type=["jpg", "png", "jpeg"])
-prompt = st.chat_input("اسأل 'لمعلم' هنا...")
-
-if prompt or uploaded_file:
-    user_text = prompt if prompt else "شرح ليا هاد التمرين"
+    is_user = msg["role"] == "user"
+    alignment = "row-reverse" if is_user else ""
+    bubble_type = "user-bubble" if is_user else "ai-bubble"
     
-    # منع التكرار
-    if not st.session_state.messages or st.session_state.messages[-1]["content"] != user_text:
-        st.session_state.messages.append({"role": "user", "content": user_text})
+    st.markdown(f"""
+        <div class="chat-row {alignment}">
+            <div class="bubble {bubble_type}">{msg["content"]}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+# 4. منطقة الأدوات (Sidebar)
+with st.sidebar:
+    st.header("🛠️ أدوات المساعدة")
+    uploaded_file = st.file_uploader("📸 ارفع صورة التمرين", type=["jpg", "jpeg", "png"])
+    audio_data = st.audio_input("🎙️ سجل سؤالك بالصوت")
+    st.divider()
+    if st.button("🗑️ مسح الحوار", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+    st.info("📍 Ibravolt - El Jadida")
+
+# 5. صندوق الشات الرئيسي
+prompt = st.chat_input("اسأل 'لمعلم' عن أي حاجة...")
+
+# 6. منطق المعالجة الاحترافي (Smart Logic)
+if prompt or uploaded_file or audio_data:
+    # تحديد محتوى سؤال المستخدم
+    current_user_content = prompt if prompt else "شوف هاد التمرين (صورة/صوت)"
+    
+    # "الديجونكتور": التأكد بلي ما كنكرروش نفس السؤال
+    if not st.session_state.messages or st.session_state.messages[-1]["content"] != current_user_content:
+        st.session_state.messages.append({"role": "user", "content": current_user_content})
         
         with st.chat_message("assistant"):
-            with st.spinner("لمعلم كيجاوب..."):
+            placeholder = st.empty()
+            with st.spinner("لمعلم كيشرح..."):
                 try:
-                    model = genai.GenerativeModel(WORKING_MODEL)
-                    parts = ["أنت 'لمعلم' خبير مغربي. جاوب بالدارجة المغربية باختصار وبأسلوب مشجع ومقاد من اليمين."]
+                    # تحضير "البرانشمان" للموديل
+                    instruction = "أنت 'لمعلم' خبير مغربي. جاوب بالدارجة المغربية بأسلوب مبسط ومحفز. ركز على الخطوات."
+                    parts = [instruction]
+                    
                     if prompt: parts.append(prompt)
                     if uploaded_file: parts.append(Image.open(uploaded_file))
+                    if audio_data: parts.append({"mime_type": "audio/wav", "data": audio_data.getvalue()})
                     
                     response = model.generate_content(parts)
-                    st.markdown(f'<div class="assistant-bubble">{response.text}</div>', unsafe_allow_html=True)
-                    st.session_state.messages.append({"role": "assistant", "content": response.text})
-                    st.rerun()
+                    full_response = response.text
+                    
+                    # حفظ وعرض الجواب
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                    st.rerun() # تحديث الصفحة لعرض الحوار مرتب
+                    
                 except Exception as e:
-                    st.error(f"خطأ: {e}")
+                    if "429" in str(e):
+                        st.error("🚫 الكوطا تسالات! تسنى 20 ثانية وعاود ورك.")
+                    else:
+                        st.error(f"مشكل تقني: {e}")
 
-st.sidebar.button("🗑️ مسح الحوار", on_click=lambda: st.session_state.clear())
+st.markdown("<br><center><small>Ibravolt Digital Solutions - 2026</small></center>", unsafe_allow_html=True)
