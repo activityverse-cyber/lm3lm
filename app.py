@@ -1,108 +1,98 @@
-import streamlit as st
-import google.generativeai as genai
-from PIL import Image
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
+import ImageUpload from "@/components/ImageUpload";
+import SubjectSelector from "@/components/SubjectSelector";
+import ExplanationDisplay from "@/components/ExplanationDisplay";
+import { analyzeExerciseImage, type GeminiResponse } from "@/lib/gemini";
+import { toast } from "sonner";
 
-# 1. الستايل الاحترافي (High Contrast & RTL)
-st.set_page_config(page_title="LM3LM Pro", page_icon="👨‍🏫", layout="wide")
+const Index = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<GeminiResponse | null>(null);
+  const [subject, setSubject] = useState("auto");
 
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
-    
-    html, body, [class*="css"], .stApp {
-        font-family: 'Vazirmatn', sans-serif !important;
-        direction: rtl !important;
-        text-align: right !important;
-        background-color: #fcfdfe !important;
+  const handleImageSelected = async (base64: string, mimeType: string) => {
+    setIsLoading(true);
+    setResult(null);
+    try {
+      const data = await analyzeExerciseImage(base64, mimeType, subject);
+      setResult(data);
+    } catch (err: any) {
+      toast.error(err.message || "حصل خطأ. المرجو المحاولة مرة أخرى.");
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    /* الهيدر */
-    .hero { 
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-        color: white !important; padding: 25px; border-radius: 20px; 
-        text-align: center; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
+  return (
+    <div className="min-h-screen gradient-hero">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+        <div className="container max-w-lg mx-auto py-3 px-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-heading font-bold text-lg">م</span>
+            </div>
+            <div>
+              <h1 className="font-heading font-bold text-foreground text-base leading-tight">مكنون OSTAD</h1>
+              <p className="text-xs text-muted-foreground">أستاذك الذكي</p>
+            </div>
+          </div>
+        </div>
+      </header>
 
-    /* تنسيق اختيار المواد (Radio Buttons as Cards) */
-    .stRadio div[role="radiogroup"] {
-        display: flex; gap: 15px; justify-content: center;
-    }
-    div[data-testid="stMarkdownContainer"] p {
-        color: #000000 !important; font-weight: bold; font-size: 1.1rem;
-    }
+      {/* Main Content */}
+      <main className="container max-w-lg mx-auto px-4 py-6 space-y-6">
+        {/* Hero Section */}
+        {!result && !isLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-4"
+          >
+            <h2 className="font-heading text-2xl font-bold text-foreground mb-2">
+              مرحباً بيك! 👋
+            </h2>
+            <p className="font-body text-muted-foreground leading-relaxed">
+              صوّر التمرين ديالك وأنا نشرحو ليك بالدارجة بطريقة بسيطة
+            </p>
+          </motion.div>
+        )}
 
-    /* إطار الجواب (Answer Box) */
-    .answer-box {
-        background-color: #ffffff; border-right: 8px solid #1e3c72; 
-        padding: 25px; border-radius: 15px; margin: 25px auto; 
-        max-width: 900px; color: #000000 !important;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        line-height: 1.8; font-size: 1.2rem;
-    }
-    
-    /* وضوح الخط الأسود */
-    .stMarkdown, p, span, label { color: #000000 !important; }
-    </style>
-    """, unsafe_allow_html=True)
+        {/* Subject Selector */}
+        {!result && !isLoading && (
+          <SubjectSelector selected={subject} onSelect={setSubject} />
+        )}
 
-# 2. الربط الذكي (الرادار ضد 404)
-try:
-    API_KEY = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=API_KEY)
-    
-    @st.cache_resource
-    def get_working_model():
-        # كيسول السيرفر على الموديلات اللي عاطياك Google دابا
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        flash = [m for m in models if "flash" in m]
-        return flash[0] if flash else models[0]
-    
-    WORKING_MODEL = get_working_model()
-except Exception as e:
-    st.error(f"⚠️ مشكل فالساروت: {e}")
-    st.stop()
+        {/* Upload Section */}
+        <ImageUpload onImageSelected={handleImageSelected} isLoading={isLoading} />
 
-# 3. واجهة التطبيق (ScanToSolve Style)
-st.markdown('<div class="hero"><h1>👨‍🏫 LM3LM - لمعلم</h1><p style="color:white !important;">صور تمرينك.. وحدد المادة باش "لمعلم" يخرج ليك الحل ناضي</p></div>', unsafe_allow_html=True)
+        {/* Loading */}
+        {isLoading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center gap-3 py-8"
+          >
+            <div className="w-14 h-14 rounded-full gradient-primary flex items-center justify-center animate-pulse-glow">
+              <Loader2 className="w-7 h-7 text-primary-foreground animate-spin" />
+            </div>
+            <p className="font-heading font-semibold text-foreground">كنحلل التمرين...</p>
+            <p className="text-sm text-muted-foreground">صبر شوية، الأستاذ كيقرا 📖</p>
+          </motion.div>
+        )}
 
-# اختيار المادة (لاكابلاج خدام)
-st.markdown('<div style="max-width:900px; margin:0 auto; margin-bottom:10px;"><b>1. اختر المادة:</b></div>', unsafe_allow_html=True)
-subject = st.radio(
-    "المادة",
-    ["📊 رياضيات", "⚛️ فيزياء", "🧪 كيمياء", "📚 أخرى"],
-    horizontal=True,
-    label_visibility="collapsed"
-)
+        {/* Results */}
+        {result && <ExplanationDisplay data={result} />}
+      </main>
 
-st.divider()
+      {/* Footer */}
+      <footer className="py-6 text-center">
+        <p className="text-xs text-muted-foreground font-body">مكنون OSTAD © 2026 — أستاذك الذكي</p>
+      </footer>
+    </div>
+  );
+};
 
-# منطقة الرفع
-st.markdown('<div style="max-width:900px; margin:0 auto; margin-bottom:10px;"><b>2. استيراد التمرين:</b></div>', unsafe_allow_html=True)
-uploaded_file = st.file_uploader("upload", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
-
-if uploaded_file:
-    img = Image.open(uploaded_file)
-    st.image(img, caption="التمرين المرفوع", width=400)
-    
-    if st.button("يا لمعلم، عطيني الحل بوضوح", use_container_width=True):
-        with st.spinner(f"لمعلم كيشوف فـ تمرين {subject}..."):
-            try:
-                model = genai.GenerativeModel(WORKING_MODEL)
-                prompt_text = f"أنت 'لمعلم' خبير مغربي. اشرح هذا التمرين الخاص بمادة {subject} بالدارجة المغربية بأسلوب مبسط وواضح جدا. ابدأ دائما من اليمين واستعمل الخط العريض للنتائج."
-                
-                response = model.generate_content([prompt_text, img])
-                
-                # عرض الجواب فـ إطار ملكي
-                st.markdown(f"""
-                    <div class="answer-box">
-                        <h2 style="color:#1e3c72; border-bottom: 2px solid #1e3c72; padding-bottom:10px;">💡 رد لمعلم ({subject}):</h2>
-                        <div style="color: #000000 !important;">
-                            {response.text}
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-            except Exception as e:
-                st.error(f"مشكل تقني: {e}")
-
-st.markdown("<br><center><small style='color:black;'>Ibravolt Digital Solution - El Jadida 2026</small></center>", unsafe_allow_html=True)
+export default Index;
