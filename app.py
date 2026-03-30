@@ -1,130 +1,148 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
-import hashlib
 
-# 1. إعداد الواجهة الاحترافية (Minimalist & Pro UI)
-st.set_page_config(page_title="أستاذ - Oustad", page_icon="👨‍🏫", layout="wide")
+# 1. إعدادات الواجهة (Advanced UI/UX)
+st.set_page_config(page_title="أستاذ - Oustad Pro", page_icon="👨‍🏫", layout="wide")
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;700&family=Inter:wght@400;600&display=swap');
     
+    /* الأساسيات */
     html, body, [class*="css"], .stApp {
-        font-family: 'Vazirmatn', sans-serif !important;
-        direction: rtl !important;
-        text-align: right !important;
-        background-color: #ffffff;
-        color: #000000 !important;
+        font-family: 'Vazirmatn', 'Inter', sans-serif !important;
+        background-color: #fcfdfe;
     }
 
-    /* هيدر الأداة */
+    /* هيدر احترافي */
     .main-header {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        padding: 3rem;
+        border-radius: 0 0 50px 50px;
         text-align: center;
-        padding: 40px 0;
-        border-bottom: 1px solid #f0f0f0;
-        margin-bottom: 30px;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     }
-    .main-header h1 { color: #1a73e8; font-size: 2.5rem; }
 
-    /* صناديق الرسائل (Chat Bubbles) */
-    .message-container {
+    /* تحكم تلقائي في اتجاه النص (Auto-Direction) */
+    .chat-bubble {
         padding: 20px;
-        border-radius: 15px;
-        margin-bottom: 20px;
-        max-width: 85%;
+        border-radius: 20px;
+        margin-bottom: 15px;
         line-height: 1.8;
         font-size: 1.1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        /* هاد الخاصية كتقاد اليمين واليسار بوحدها */
+        unicode-bidi: plaintext;
+        text-align: start; 
     }
-    .user-msg { background-color: #f8f9fa; border: 1px solid #eee; float: right; color: #3c4043 !important; }
-    .ai-msg { background-color: #e8f0fe; border-right: 5px solid #1a73e8; float: left; color: #1967d2 !important; }
 
-    /* إخفاء واجهة ستريمليت الزايدة */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+    .user-style {
+        background-color: #ffffff;
+        border: 1px solid #e0e6ed;
+        color: #2d3436;
+        margin-left: 20%; /* دفع الرسالة لليسر */
+    }
+
+    .ai-style {
+        background-color: #eef5ff;
+        border-right: 6px solid #1a73e8;
+        color: #1e3c72;
+        margin-right: 10%; /* دفع الرسالة لليمين */
+    }
+
+    /* ستايل خاص للصور والملفات */
+    .stFileUploader {
+        background: white;
+        padding: 20px;
+        border-radius: 15px;
+        border: 2px dashed #1a73e8;
+    }
+
+    /* إخفاء الزوائد */
+    #MainMenu, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# 2. إعداد "أستاذ" (الرادار الأوتوماتيكي للخدمة)
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# 2. نظام الذاكرة والموديل (بدون 404)
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
     
-    # كنقلبو على أحسن موديل متاح بلا ما نكتبو سميتو (ضد الـ 404)
     @st.cache_resource
-    def get_best_model():
+    def load_model():
         models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        flash_models = [m for m in models if "flash" in m]
-        return flash_models[0] if flash_models else models[0]
+        best = [m for m in models if "flash" in m]
+        return best[0] if best else models[0]
     
-    WORKING_MODEL = get_best_model()
-except Exception as e:
-    st.error("⚠️ مشكل فـ الساروت (API Key)!")
+    WORKING_MODEL = load_model()
+except:
+    st.error("⚠️ تأكد من إعداد API Key في Secrets")
     st.stop()
 
-# 3. واجهة "أستاذ" الرئيسية
-st.markdown('<div class="main-header"><h1>👨‍🏫 أستاذ (Oustad)</h1><p>شرح مبسط، تفاعلي، وذكي لكل التمارين</p></div>', unsafe_allow_html=True)
+# 3. واجهة أستاذ
+st.markdown('<div class="main-header"><h1>👨‍🏫 أستاذ (Oustad Pro)</h1><p>منصة الشرح الذكي - تفاعل، تعلم، وتفوق</p></div>', unsafe_allow_html=True)
 
-# القائمة الجانبية (الأدوات)
+# القائمة الجانبية
 with st.sidebar:
-    st.markdown("### 📚 أدوات الأستاذ")
-    subject = st.selectbox("اختر المادة:", ["رياضيات", "فيزياء", "كيمياء", "علوم الحياة والأرض", "أخرى"])
-    uploaded_file = st.file_uploader("📸 ارفع صورة التمرين هنا", type=["jpg", "png", "jpeg"])
-    if st.button("🗑️ مسح الحوار وابدأ من جديد"):
-        st.session_state.messages = []
+    st.image("https://cdn-icons-png.flaticon.com/512/3426/3426653.png", width=100)
+    st.title("إعدادات الدرس")
+    subject = st.selectbox("المادة الحالية:", ["الرياضيات", "الفيزياء", "الكيمياء", "علوم الحياة", "اللغات"])
+    uploaded_file = st.file_uploader("📸 صور التمرين أو الدرس", type=["jpg", "png", "jpeg"])
+    if st.button("🔄 حوار جديد"):
+        st.session_state.chat_history = []
         st.rerun()
 
-# 4. منطقة الحوار (Chat Display)
-for msg in st.session_state.messages:
-    style = "user-msg" if msg["role"] == "user" else "ai-msg"
-    with st.chat_message(msg["role"]):
-        st.markdown(f'<div class="message-container {style}">{msg["content"]}</div>', unsafe_allow_html=True)
+# 4. عرض الشات
+for chat in st.session_state.chat_history:
+    bubble_class = "user-style" if chat["role"] == "user" else "ai-style"
+    with st.container():
+        st.markdown(f'<div class="chat-bubble {bubble_class}">{chat["content"]}</div>', unsafe_allow_html=True)
 
-# 5. منطق التعامل مع الأسئلة (Chat & Scan)
-prompt = st.chat_input("اسأل أستاذ عن أي حاجة فـ التمرين...")
+# 5. منطقة التفاعل
+user_input = st.chat_input("تواصل مع أستاذ هنا...")
 
-if prompt or uploaded_file:
-    # تحديد محتوى الإدخال
-    user_content = prompt if prompt else "ممكن تشرح ليا هاد التمرين اللي فـ الصورة؟"
+if user_input or uploaded_file:
+    # تحديد النص للعرض
+    display_text = user_input if user_input else "ممكن تشرح ليا هاد الصورة؟"
     
     # منع التكرار
-    if not st.session_state.messages or st.session_state.messages[-1]["content"] != user_content:
-        st.session_state.messages.append({"role": "user", "content": user_content})
+    if not st.session_state.chat_history or st.session_state.chat_history[-1]["content"] != display_text:
+        st.session_state.chat_history.append({"role": "user", "content": display_text})
         
         with st.chat_message("assistant"):
-            with st.spinner("أستاذ كيشوف فـ المعطيات..."):
+            with st.spinner("أستاذ كيكتب ليك الشرح..."):
                 try:
                     model = genai.GenerativeModel(WORKING_MODEL)
                     
-                    # صياغة السياق (أستاذ كيشرح وماشي غير كيعطي الحل)
-                    context = f"""أنت 'أستاذ' خبير تعليمي مغربي. هدفك هو مساعدة التلميذ على فهم المادة ({subject}).
-                    - اشرح الخطوات بالدارجة المغربية بأسلوب تربوي، سهل ومبسط.
-                    - لا تعطي الحل النهائي مباشرة، بل اشرح 'لماذا' وكيف وصلنا للنتيجة.
-                    - تفاعل مع التلميذ كأستاذ حقيقي في القسم.
-                    - اكتب دائماً من اليمين إلى اليسار وبخط واضح."""
+                    # سياق أستاذ (الذكاء البيداغوجي)
+                    instruction = f"""أنت 'أستاذ' مغربي خبير. 
+                    - المادة: {subject}.
+                    - اللغة: جاوب بالدارجة المغربية بأسلوب تربوي مبسط.
+                    - التنسيق: إذا كتبت بالعربية ابدأ من اليمين، وإذا كتبت معادلات أو فرنسية اتركها تظهر من اليسار.
+                    - المهمة: اشرح المفهوم بذكاء، استعمل أمثلة من الواقع، ولا تعطي الحلول الجاهزة فقط."""
                     
-                    parts = [context]
-                    
-                    # إذا كان هناك حوار سابق، نزود الموديل بيه (Chat Memory)
-                    for m in st.session_state.messages[-5:]: # آخر 5 رسائل للحفاظ على الكوطا
+                    # بناء محتوى الطلب
+                    parts = [instruction]
+                    # إضافة سياق المحادثة (الذاكرة)
+                    for m in st.session_state.chat_history[-6:]:
                         parts.append(f"{m['role']}: {m['content']}")
                     
                     if uploaded_file:
                         parts.append(Image.open(uploaded_file))
-                    
-                    if prompt:
-                        parts.append(prompt)
+                    if user_input:
+                        parts.append(user_input)
 
                     response = model.generate_content(parts)
-                    answer = response.text
-                    
-                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                    st.session_state.chat_history.append({"role": "assistant", "content": response.text})
                     st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"وقع مشكل تقني: {e}")
 
-st.markdown("<br><center><small>منصة أستاذ التعليمية - 2026</small></center>", unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"عذراً، وقع مشكل تقني: {e}")
+
+st.markdown("<hr><center><p style='color: #a0aec0;'>منصة أستاذ - ذكاء تعليمي مغربي 2026</p></center>", unsafe_allow_html=True)
