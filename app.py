@@ -2,73 +2,102 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# 1. الستايل (RTL & High Contrast)
+# 1. الستايل الاحترافي (High Contrast & RTL)
 st.set_page_config(page_title="LM3LM Pro", page_icon="👨‍🏫", layout="wide")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
+    
     html, body, [class*="css"], .stApp {
         font-family: 'Vazirmatn', sans-serif !important;
         direction: rtl !important;
         text-align: right !important;
-        color: #000000 !important;
+        background-color: #fcfdfe !important;
     }
-    .hero { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white !important; padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 20px; }
+
+    /* الهيدر */
+    .hero { 
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+        color: white !important; padding: 25px; border-radius: 20px; 
+        text-align: center; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    /* تنسيق اختيار المواد (Radio Buttons as Cards) */
+    .stRadio div[role="radiogroup"] {
+        display: flex; gap: 15px; justify-content: center;
+    }
+    div[data-testid="stMarkdownContainer"] p {
+        color: #000000 !important; font-weight: bold; font-size: 1.1rem;
+    }
+
+    /* إطار الجواب (Answer Box) */
+    .answer-box {
+        background-color: #ffffff; border-right: 8px solid #1e3c72; 
+        padding: 25px; border-radius: 15px; margin: 25px auto; 
+        max-width: 900px; color: #000000 !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        line-height: 1.8; font-size: 1.2rem;
+    }
     
-    /* ستايل باش نرجعو الراديو يبان بحال الكارويات */
-    div[data-testid="stWidgetLabel"] { display: none; } /* إخفاء لابل الراديو */
-    .st-emotion-cache-16idsys p { font-size: 1.1rem; font-weight: bold; color: black !important; }
+    /* وضوح الخط الأسود */
+    .stMarkdown, p, span, label { color: #000000 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. الربط بالساروت
+# 2. الربط الذكي (الرادار ضد 404)
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-flash")
-except:
-    st.error("⚠️ الساروت ناقص!")
+    
+    @st.cache_resource
+    def get_working_model():
+        # كيسول السيرفر على الموديلات اللي عاطياك Google دابا
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        flash = [m for m in models if "flash" in m]
+        return flash[0] if flash else models[0]
+    
+    WORKING_MODEL = get_working_model()
+except Exception as e:
+    st.error(f"⚠️ مشكل فالساروت: {e}")
     st.stop()
 
-# 3. الواجهة
-st.markdown('<div class="hero"><h1>👨‍🏫 LM3LM - لمعلم</h1><p style="color:white !important;">صور تمرينك.. وحدد المادة باش الجواب يكون دقيق</p></div>', unsafe_allow_html=True)
+# 3. واجهة التطبيق (ScanToSolve Style)
+st.markdown('<div class="hero"><h1>👨‍🏫 LM3LM - لمعلم</h1><p style="color:white !important;">صور تمرينك.. وحدد المادة باش "لمعلم" يخرج ليك الحل ناضي</p></div>', unsafe_allow_html=True)
 
-# --- هنا "لاكابلاج" الجديد ديال المواد ---
-st.markdown('<div style="max-width:850px; margin:0 auto;"><b>1. اختر المادة (ضروري):</b></div>', unsafe_allow_html=True)
-
-# استعملنا st.radio ودرنا ليه Horizontal باش يجي مستف
-selected_subject = st.radio(
+# اختيار المادة (لاكابلاج خدام)
+st.markdown('<div style="max-width:900px; margin:0 auto; margin-bottom:10px;"><b>1. اختر المادة:</b></div>', unsafe_allow_html=True)
+subject = st.radio(
     "المادة",
     ["📊 رياضيات", "⚛️ فيزياء", "🧪 كيمياء", "📚 أخرى"],
     horizontal=True,
     label_visibility="collapsed"
 )
 
-st.write(f"✅ المادة المختارة: **{selected_subject}**")
 st.divider()
 
-# 4. منطقة الرفع والحل
-st.markdown('<div style="max-width:850px; margin:0 auto;"><b>2. استيراد التمرين:</b></div>', unsafe_allow_html=True)
+# منطقة الرفع
+st.markdown('<div style="max-width:900px; margin:0 auto; margin-bottom:10px;"><b>2. استيراد التمرين:</b></div>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader("upload", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
 
 if uploaded_file:
     img = Image.open(uploaded_file)
-    st.image(img, caption="التمرين المرفوع", width=350)
+    st.image(img, caption="التمرين المرفوع", width=400)
     
     if st.button("يا لمعلم، عطيني الحل بوضوح", use_container_width=True):
-        with st.spinner(f"لمعلم كيشوف فـ تمرين {selected_subject}..."):
+        with st.spinner(f"لمعلم كيشوف فـ تمرين {subject}..."):
             try:
-                # دابا صيفطنا للموديل حتى المادة باش يعرف اشنو كيدير
-                prompt_text = f"أنت 'لمعلم' خبير مغربي. اشرح هذا التمرين الخاص بمادة {selected_subject} بالدارجة المغربية بأسلوب مبسط. اجعل الخطوات واضحة جدا باللون الأسود. ابدأ من اليمين."
+                model = genai.GenerativeModel(WORKING_MODEL)
+                prompt_text = f"أنت 'لمعلم' خبير مغربي. اشرح هذا التمرين الخاص بمادة {subject} بالدارجة المغربية بأسلوب مبسط وواضح جدا. ابدأ دائما من اليمين واستعمل الخط العريض للنتائج."
                 
                 response = model.generate_content([prompt_text, img])
                 
+                # عرض الجواب فـ إطار ملكي
                 st.markdown(f"""
-                    <div style="background-color: #ffffff; border-right: 8px solid #1e3c72; padding: 25px; border-radius: 15px; margin: 20px auto; max-width: 850px; color: #000000 !important; box-shadow: 0 10px 25px rgba(0,0,0,0.1); line-height: 1.8;">
-                        <h2 style="color:#1e3c72; border-bottom: 2px solid #1e3c72; padding-bottom:10px;">💡 رد لمعلم ({selected_subject}):</h2>
-                        <div style="font-size: 1.2rem; font-weight: 500; color: black !important;">
-                        {response.text}
+                    <div class="answer-box">
+                        <h2 style="color:#1e3c72; border-bottom: 2px solid #1e3c72; padding-bottom:10px;">💡 رد لمعلم ({subject}):</h2>
+                        <div style="color: #000000 !important;">
+                            {response.text}
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
