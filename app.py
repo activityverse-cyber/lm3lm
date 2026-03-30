@@ -1,151 +1,114 @@
 import streamlit as st
+import google.generativeai as genai
+from PIL import Image
+import io
 
-# 1. إعدادات الهوية البصرية (Meta Tags & Page Config)
+# 1. إعدادات الصفحة (Page Configuration)
 st.set_page_config(
     page_title="أستاذ - Oustad Pro",
     page_icon="👨‍🏫",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# 2. كود CSS الاحترافي (الفينيسيون ديال ScanToSolve)
+# 2. كود CSS "الفينيسيون" (Custom Styling)
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;500;700&display=swap');
     
-    /* الأساسيات */
     html, body, [class*="css"], .stApp {
         font-family: 'Vazirmatn', sans-serif !important;
         direction: rtl !important;
         background-color: #fcfdfe !important;
     }
 
-    /* الهيدر العلوي (Top Navigation) */
-    .header-bar {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px 5%;
-        background: white;
-        border-bottom: 1px solid #f0f0f0;
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-    }
-    
+    /* تنسيق السايدبار */
+    [data-testid="stSidebar"] { background-color: #ffffff !important; border-left: 1px solid #f0f0f0; }
+    .sidebar-item { display: flex; align-items: center; padding: 12px 20px; margin: 5px 10px; border-radius: 12px; color: #3c4043; font-weight: 500; }
+    .active-item { background-color: #e6fcf5 !important; color: #00b894 !important; }
+    .pro-item { background-color: #fff9db !important; color: #f08c00 !important; }
+
+    /* الهيدر العلوي */
+    .header-bar { display: flex; justify-content: space-between; align-items: center; padding: 15px 5%; background: white; border-bottom: 1px solid #f0f0f0; }
     .logo-text { color: #1a73e8; font-weight: 700; font-size: 1.5rem; }
-    .credit-box {
-        background: #fff9db;
-        border: 1px solid #ffe066;
-        padding: 5px 15px;
-        border-radius: 20px;
-        color: #f08c00;
-        font-weight: bold;
-    }
+    .credit-tag { background: #fff9db; padding: 5px 15px; border-radius: 20px; color: #f08c00; font-weight: bold; border: 1px solid #ffe066; }
 
-    /* كارت الخطة (Premium Card) */
-    .plan-section {
-        max-width: 800px;
-        margin: 20px auto;
-        background: white;
-        border-radius: 16px;
-        padding: 20px;
-        border: 1px solid #eef0f2;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-    }
+    /* منطقة الرفع والحل */
+    .upload-card { background: white; border: 2px dashed #dfe6e9; border-radius: 24px; padding: 40px; text-align: center; max-width: 800px; margin: 0 auto; }
+    .answer-box { background: white; border-right: 6px solid #1a73e8; padding: 25px; border-radius: 15px; margin-top: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); unicode-bidi: plaintext; text-align: start; color: #000 !important; }
     
-    .btn-upgrade {
-        background-color: #00b894;
-        color: white !important;
-        padding: 10px 20px;
-        border-radius: 12px;
-        text-decoration: none;
-        font-weight: bold;
-    }
-
-    /* عنوان الأقسام */
-    .section-label {
-        max-width: 800px;
-        margin: 30px auto 10px;
-        font-weight: bold;
-        color: #2d3436;
-    }
-
-    /* منطقة الرفع (Upload Zone) */
-    .upload-container {
-        max-width: 800px;
-        margin: 0 auto;
-        background: white;
-        border: 2px dashed #dfe6e9;
-        border-radius: 24px;
-        padding: 50px 20px;
-        text-align: center;
-        transition: 0.3s;
-    }
-    .upload-container:hover { border-color: #1a73e8; background: #f8fbff; }
-
-    /* إخفاء واجهة ستريمليت الأصلية */
+    /* إخفاء الزوائد */
     #MainMenu, footer, header {visibility: hidden;}
     .stFileUploader label { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. رسم الواجهة (UI Elements)
+# 3. إعداد "أستاذ" (AI Setup)
+try:
+    API_KEY = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=API_KEY)
+    @st.cache_resource
+    def get_model():
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        flash = [m for m in models if "flash" in m]
+        return flash[0] if flash else models[0]
+    WORKING_MODEL = get_model()
+except:
+    st.error("⚠️ تأكد من وضع GOOGLE_API_KEY في Secrets")
+    st.stop()
 
-# --- الهيدر ---
+# 4. بناء السايدبار (Sidebar)
+with st.sidebar:
+    st.markdown("""
+        <div class="sidebar-item active-item">🏠 &nbsp; Accueil</div>
+        <div class="sidebar-item">🕒 &nbsp; Historique</div>
+        <div class="sidebar-item pro-item">⚡ &nbsp; Passer au pro</div>
+        <div style="height: 45vh;"></div>
+        <div style="border-top: 1px solid #eee; padding-top: 20px;">
+            <div class="sidebar-item">🌐 &nbsp; FR Français</div>
+            <div class="sidebar-item">⚙️ &nbsp; Paramètres</div>
+            <div class="sidebar-item" style="color: #eb4d4b;">↪️ &nbsp; Déconnexion</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+# 5. واجهة المستخدم الرئيسية (Main UI)
 st.markdown("""
     <div class="header-bar">
         <div class="logo-text">👨‍🏫 أستاذ</div>
-        <div class="credit-box">⚡ رصيد يومي : 1</div>
+        <div class="credit-tag">⚡ رصيد يومي : 1</div>
     </div>
     """, unsafe_allow_html=True)
 
-# --- كارت الخطة ---
-st.markdown("""
-    <div class="plan-section">
-        <div style="display:flex; align-items:center; gap:12px;">
-            <div style="font-size:24px;">🔓</div>
-            <div>
-                <b style="color:black;">الخطة المجانية</b><br>
-                <small style="color:gray;">1 تمرين متبقي اليوم</small>
-            </div>
-        </div>
-        <a class="btn-upgrade">Passer à Premium</a>
-    </div>
-    """, unsafe_allow_html=True)
+# اختيار المادة
+st.markdown('<div style="max-width:800px; margin: 20px auto 10px;"><b>اختر المادة:</b></div>', unsafe_allow_html=True)
+subject = st.radio("Matière", ["📊 Maths", "⚛️ Physique", "🧪 Chimie", "📚 Autre"], horizontal=True, label_visibility="collapsed")
 
-# --- اختيار المادة ---
-st.markdown('<div class="section-label">Sélectionnez la matière</div>', unsafe_allow_html=True)
-
-# هنا غانخدمو بـ columns باش نديرو المربعات ديال المواد
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.button("📊 Maths", use_container_width=True)
-with col2:
-    st.button("⚛️ Physique", use_container_width=True)
-with col3:
-    st.button("🧪 Chimie", use_container_width=True)
-with col4:
-    st.button("📚 Autre", use_container_width=True)
-
-# --- منطقة الرفع ---
-st.markdown('<div class="section-label">Importez votre exercice</div>', unsafe_allow_html=True)
-
-# الـ Uploader الحقيقي غانغطيوه بالديكور
+# منطقة الرفع
+st.markdown('<div style="max-width:800px; margin: 20px auto 10px;"><b>استورد تمرينك:</b></div>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader("upload", type=["jpg", "png", "jpeg"])
 
 if not uploaded_file:
     st.markdown("""
-        <div class="upload-container">
-            <div style="font-size:50px; color:#1a73e8; margin-bottom:15px;">📤</div>
-            <h3 style="color:#2d3436; margin-bottom:5px;">Importez votre exercice</h3>
-            <p style="color:#636e72;">Cliquez ou glissez-déposez une image<br><small>PNG, JPG jusqu'à 10MB</small></p>
+        <div class="upload-card">
+            <div style="font-size:50px;">📤</div>
+            <h3 style="color:#2d3436;">Importez votre exercice</h3>
+            <p style="color:#636e72;">اضغط هنا أو اسحب الصورة<br><small>PNG, JPG حتى 10MB</small></p>
         </div>
-        """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 else:
-    st.success("✅ الصورة ترفعات ناضية! دابا خاصنا نربطوها بـ 'أستاذ'.")
+    img = Image.open(uploaded_file)
+    st.image(img, caption="التمرين المرفوع", width=400)
+    
+    if st.button("يا أستاذ، عطيني الحل", use_container_width=True):
+        with st.spinner("أستاذ كيشرح ليك دابا..."):
+            try:
+                model = genai.GenerativeModel(WORKING_MODEL)
+                response = model.generate_content([
+                    f"أنت 'أستاذ' مغربي خبير. اشرح هاد التمرين ديال {subject} بالدارجة المغربية بأسلوب مبسط وواضح. ابدأ من اليمين واستعمل اللون الأسود.",
+                    img
+                ])
+                st.markdown(f'<div class="answer-box"><b>💡 شرح الأستاذ:</b><br><br>{response.text}</div>', unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"مشكل تقني: {e}")
 
-st.markdown("<br><br><center><small style='color:#a0aec0;'>© 2026 Oustad Pro - Powered by Ibravolt</small></center>", unsafe_allow_html=True)
+st.markdown("<br><center><small>© 2026 Oustad Pro - Ibravolt</small></center>", unsafe_allow_html=True)
