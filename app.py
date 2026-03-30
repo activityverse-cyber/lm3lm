@@ -1,98 +1,104 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Loader2 } from "lucide-react";
-import ImageUpload from "@/components/ImageUpload";
-import SubjectSelector from "@/components/SubjectSelector";
-import ExplanationDisplay from "@/components/ExplanationDisplay";
-import { analyzeExerciseImage, type GeminiResponse } from "@/lib/gemini";
-import { toast } from "sonner";
+import streamlit as st
+import google.generativeai as genai
+from PIL import Image
+import json
 
-const Index = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<GeminiResponse | null>(null);
-  const [subject, setSubject] = useState("auto");
+# --- إعدادات الصفحة والتصميم ---
+st.set_page_config(page_title="مكنون OSTAD", page_icon="🎓", layout="centered")
 
-  const handleImageSelected = async (base64: string, mimeType: string) => {
-    setIsLoading(true);
-    setResult(null);
-    try {
-      const data = await analyzeExerciseImage(base64, mimeType, subject);
-      setResult(data);
-    } catch (err: any) {
-      toast.error(err.message || "حصل خطأ. المرجو المحاولة مرة أخرى.");
-    } finally {
-      setIsLoading(false);
+# تصميم RTL متطور كيشبه الكود ديالك
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Tajawal', sans-serif;
+        direction: rtl;
+        text-align: right;
     }
-  };
+    .gradient-hero {
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        padding: 2rem;
+        border-radius: 20px;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        background: linear-gradient(90deg, #2563eb, #0ea5e9);
+        color: white;
+        border: none;
+        padding: 0.75rem;
+        font-weight: bold;
+    }
+    .card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        margin-bottom: 1rem;
+    }
+    </style>
+    """, unsafe_allow_stdio=True)
 
-  return (
-    <div className="min-h-screen gradient-hero">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container max-w-lg mx-auto py-3 px-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-heading font-bold text-lg">م</span>
-            </div>
-            <div>
-              <h1 className="font-heading font-bold text-foreground text-base leading-tight">مكنون OSTAD</h1>
-              <p className="text-xs text-muted-foreground">أستاذك الذكي</p>
-            </div>
-          </div>
-        </div>
-      </header>
+# --- إعداد Gemini API ---
+API_KEY = "AIzaSyAwRhHWoBqwjFSbjtQmOcwD_55UOHZdY1w"
+genai.configure(api_key=API_KEY)
 
-      {/* Main Content */}
-      <main className="container max-w-lg mx-auto px-4 py-6 space-y-6">
-        {/* Hero Section */}
-        {!result && !isLoading && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center py-4"
-          >
-            <h2 className="font-heading text-2xl font-bold text-foreground mb-2">
-              مرحباً بيك! 👋
-            </h2>
-            <p className="font-body text-muted-foreground leading-relaxed">
-              صوّر التمرين ديالك وأنا نشرحو ليك بالدارجة بطريقة بسيطة
-            </p>
-          </motion.div>
-        )}
+# موجه النظام (System Prompt) - الالتزام التام بطلبك
+SYSTEM_PROMPT = """
+{  "system_prompt": "You are PROMPT-NEXUS-8.0, operating as 'Ustad Maghribi', an expert educational assistant for primary and secondary school students in Morocco... [أكمل هنا الموجه الذي قدمته بالكامل]"}
+"""
 
-        {/* Subject Selector */}
-        {!result && !isLoading && (
-          <SubjectSelector selected={subject} onSelect={setSubject} />
-        )}
+# --- الواجهة (UI) ---
+st.markdown('<div class="gradient-hero"><h1>م | مكنون OSTAD</h1><p>أستاذك الذكي - صوّر التمرين ديالك وأنا نشرحو ليك</p></div>', unsafe_allow_html=True)
 
-        {/* Upload Section */}
-        <ImageUpload onImageSelected={handleImageSelected} isLoading={isLoading} />
+# اختيار المادة (Subject Selector)
+subject = st.selectbox("ختار المادة:", ["تلقائي (Auto)", "رياضيات", "فيزياء وكيمياء", "علوم الحياة والأرض", "لغة عربية", "لغة فرنسية"])
 
-        {/* Loading */}
-        {isLoading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex flex-col items-center gap-3 py-8"
-          >
-            <div className="w-14 h-14 rounded-full gradient-primary flex items-center justify-center animate-pulse-glow">
-              <Loader2 className="w-7 h-7 text-primary-foreground animate-spin" />
-            </div>
-            <p className="font-heading font-semibold text-foreground">كنحلل التمرين...</p>
-            <p className="text-sm text-muted-foreground">صبر شوية، الأستاذ كيقرا 📖</p>
-          </motion.div>
-        )}
+# رفع الصورة (Image Upload)
+uploaded_file = st.file_uploader("ارفع صورة التمرين (JPG/PNG)", type=["jpg", "jpeg", "png"])
 
-        {/* Results */}
-        {result && <ExplanationDisplay data={result} />}
-      </main>
+if uploaded_file:
+    image = Image.open(uploaded_file)
+    st.image(image, caption='التمرين المرفوع', use_container_width=True)
+    
+    if st.button("تحليل التمرين 🚀"):
+        with st.spinner('صبر شوية، الأستاذ كيقرا 📖...'):
+            try:
+                model = genai.GenerativeModel('gemini-1.5-flash') # أو gemini-2.0-flash إذا توفر
+                response = model.generate_content(
+                    [f"المادة المختارة: {subject}\n\n{SYSTEM_PROMPT}", image],
+                    generation_config={"response_mime_type": "application/json"}
+                )
+                
+                # استخراج البيانات
+                res_data = json.loads(response.text)
+                
+                # --- عرض النتائج (ExplanationDisplay) ---
+                st.balloons()
+                st.markdown(f"### ✨ {res_data['lesson_title']}")
+                st.success(res_data['encouragement_message'])
+                
+                with st.container():
+                    st.markdown("#### 👨‍🏫 الشرح:")
+                    st.info(res_data['pedagogical_explanation'])
+                    
+                    st.markdown("#### 📝 خطوات المساعدة:")
+                    for step in res_data['example_solution_steps']:
+                        st.markdown(f"✅ **{step['step_number']}:** {step['instruction']}")
+                
+                if res_data.get('terminology_notes'):
+                    with st.expander("🔍 شرح المصطلحات"):
+                        for term in res_data['terminology_notes']:
+                            st.write(f"• **{term['term']}**: {term['explanation']}")
+                
+                st.markdown("---")
+                st.warning(f"💡 **نصيحة الأستاذ:** {res_data['final_summary']}")
 
-      {/* Footer */}
-      <footer className="py-6 text-center">
-        <p className="text-xs text-muted-foreground font-body">مكنون OSTAD © 2026 — أستاذك الذكي</p>
-      </footer>
-    </div>
-  );
-};
+            except Exception as e:
+                st.error("وقع خطأ فني. تأكد من جودة الصورة أو مفتاح API.")
+                st.info(f"الخطأ: {str(e)}")
 
-export default Index;
+st.markdown('<p style="text-align:center; color:gray; font-size:12px;">مكنون OSTAD © 2026 — أستاذك الذكي</p>', unsafe_allow_html=True)
